@@ -62,6 +62,8 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
       }) => {
         const store = useStore.getState();
         store.setReadingPreferences(params);
+        store.setDockOpen(false);
+        store.showToast('✓ Reading mode configuration applied by NOD Agent');
         store.announce('Reading mode and typography adjusted.');
         store.setMascotMood('nodding');
         setTimeout(() => store.setMascotMood('idle'), 2000);
@@ -134,6 +136,7 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
           keyTakeaways,
           isActive: true,
         });
+        store.showToast('✓ Plain-language view rendered by NOD Agent');
         store.announce('Article has been simplified into plain English.');
         store.setMascotMood('nodding');
         setTimeout(() => store.setMascotMood('idle'), 2500);
