@@ -7,6 +7,7 @@ import { AccessibilityDock } from '@/components/accessibility/AccessibilityDock'
 import { WebMCPSimulator } from '@/components/accessibility/WebMCPSimulator';
 import { PeekModal } from '@/components/feed/PeekModal';
 import { Header } from '@/components/brand/Header';
+import { RsvpReader } from '@/components/RsvpReader';
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
   // Registers all canonical WebMCP tools in-browser with document.modelContext
@@ -36,6 +37,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <AccessibilityDock />
       <PeekModal />
       <WebMCPSimulator />
+      <RsvpReader />
     </>
   );
 }

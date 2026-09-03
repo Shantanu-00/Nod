@@ -150,34 +150,33 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
     // 3. ASSIST DRAFT CONTENT (8-12 WPM Telegraphic Shorthand Expander)
     {
       name: 'assist_draft_content',
-      description: 'Assists the author in expanding raw telegraphic shorthand or phonetic text into clear sentences while strictly preserving their authentic voice.',
+      description: 'Assists the author in expanding raw telegraphic shorthand or phonetic text into clear sentences while strictly preserving their authentic voice. Directly opens the Binary Gatekeeper Review Modal on the screen.',
       inputSchema: {
         type: 'object',
         properties: {
           rawText: {
             type: 'string',
-            description: 'The unpolished, phonetic, or shorthand thoughts provided by the user.'
+            description: 'The unpolished, phonetic, or shorthand thoughts provided by the user. If omitted, uses the current text in the editor.'
           },
           intent: {
             type: 'string',
             enum: ['spelling_grammar_cleanup', 'shorten_and_clarify', 'expand_telegraphic_shorthand'],
             description: 'The specific editorial assistance desired.'
           }
-        },
-        required: ['rawText']
+        }
       },
-      annotations: {
-        readOnlyHint: true,
-      },
-      execute: async ({ rawText, intent = 'expand_telegraphic_shorthand' }: { rawText: string; intent?: string }) => {
-        if (!rawText || rawText.trim().length < 3) {
-          throw new Error('Input text must be at least 3 characters.');
+      // Deliberately OMIT readOnlyHint: Mutates editor state & launches Binary Review Modal
+      execute: async ({ rawText, intent = 'expand_telegraphic_shorthand' }: { rawText?: string; intent?: string }) => {
+        const store = useStore.getState();
+        const inputText = (rawText && rawText.trim().length > 0) ? rawText.trim() : store.editorDraft.content.trim();
+        if (!inputText || inputText.length < 3) {
+          throw new Error('Input text must be at least 3 characters. Provide rawText or type notes in the editor.');
         }
 
         // Lightweight client expansion logic to fulfill prototype requirements
-        let expanded = rawText.trim();
+        let expanded = inputText;
         if (intent === 'expand_telegraphic_shorthand') {
-          expanded = rawText
+          expanded = inputText
             .split('\n')
             .map((line) => {
               const clean = line.replace(/^[-*•]\s*/, '').trim();
@@ -189,17 +188,16 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
             .join(' ');
         }
 
-        const store = useStore.getState();
-        store.announce('Draft content expanded by NOD agent.');
-        store.setMascotMood('nodding');
-        setTimeout(() => store.setMascotMood('idle'), 1500);
+        // Trigger binary gatekeeper review on the active canvas
+        store.proposeEditorDraft({ proposedText: expanded });
 
         return {
-          original: rawText,
+          original: inputText,
           proposal: expanded,
           intent,
-          wordCountOriginal: rawText.split(/\s+/).length,
+          wordCountOriginal: inputText.split(/\s+/).length,
           wordCountExpanded: expanded.split(/\s+/).length,
+          message: 'Expansion generated and opened in the Binary Gatekeeper Review Modal on screen.',
         };
       }
     },
@@ -360,6 +358,244 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
         }
 
         return { success: true, message: 'Comment posted.' };
+      }
+    },
+
+    // 7. CONTROL FOCAL READER (Zero-Saccade RSVP with ORP)
+    {
+      name: 'control_focal_reader',
+      description: 'Controls the Zero-Saccade / RSVP focal reader. Use this tool when the user wants to read text one word at a time without moving their eyes, reduce ocular motor strain, eliminate visual clutter for ADHD focus, or adjust reading pace (WPM). Supports start, pause, resume, stop, and speed adjustment.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          action: {
+            type: 'string',
+            enum: ['start', 'pause', 'resume', 'stop', 'set_speed'],
+            description: 'Action to perform on the focal reader: start, pause, resume, stop, or set_speed.'
+          },
+          wpm: {
+            type: 'number',
+            description: 'Reading pace in words per minute (e.g., 200, 250, 350). Defaults to current or 250.'
+          },
+          text: {
+            type: 'string',
+            description: 'Custom text or prose to read. If omitted during "start", text is extracted from the active article.'
+          }
+        },
+        required: ['action']
+      },
+      // Deliberately OMIT readOnlyHint: Mutates visible UI / opens overlay
+      execute: async ({ action, wpm, text }: { action: 'start' | 'pause' | 'resume' | 'stop' | 'set_speed'; wpm?: number; text?: string }) => {
+        const store = useStore.getState();
+
+        if (action === 'start') {
+          const targetText = text || store.activeArticle?.content.rawMarkdown || store.activeArticle?.summary || '';
+          if (!targetText || targetText.trim().length === 0) {
+            throw new Error('Cannot start focal reader: No text provided and no active article is currently open.');
+          }
+          const targetWpm = wpm && wpm >= 50 ? wpm : 250;
+          store.openFocalReader(targetText, targetWpm);
+          store.showToast(`✓ Zero-Saccade Reader started (${targetWpm} WPM)`);
+          store.setMascotMood('nodding');
+          setTimeout(() => store.setMascotMood('idle'), 2000);
+          return {
+            success: true,
+            action: 'start',
+            wpm: targetWpm,
+            wordCount: useStore.getState().focalReader.words.length,
+            message: 'Zero-Saccade focal reader launched and playing.',
+          };
+        }
+
+        if (action === 'pause') {
+          store.pauseFocalReader();
+          store.showToast('Zero-Saccade Reader paused');
+          return {
+            success: true,
+            action: 'pause',
+            currentIndex: store.focalReader.currentIndex,
+            totalWords: store.focalReader.words.length,
+            message: 'Zero-Saccade focal reader paused.',
+          };
+        }
+
+        if (action === 'resume') {
+          store.playFocalReader();
+          store.showToast('Zero-Saccade Reader resumed');
+          return {
+            success: true,
+            action: 'resume',
+            currentIndex: store.focalReader.currentIndex,
+            totalWords: store.focalReader.words.length,
+            message: 'Zero-Saccade focal reader resumed.',
+          };
+        }
+
+        if (action === 'stop') {
+          store.closeFocalReader();
+          store.showToast('Zero-Saccade Reader closed');
+          return {
+            success: true,
+            action: 'stop',
+            message: 'Zero-Saccade focal reader closed.',
+          };
+        }
+
+        if (action === 'set_speed') {
+          if (!wpm || wpm < 50 || wpm > 1200) {
+            throw new Error('Speed (wpm) is required and must be between 50 and 1200.');
+          }
+          store.setFocalReaderSpeed(wpm);
+          store.showToast(`Pace updated to ${wpm} WPM`);
+          return {
+            success: true,
+            action: 'set_speed',
+            wpm,
+            message: `Reading speed adjusted to ${wpm} words per minute.`,
+          };
+        }
+
+        throw new Error(`Unknown action "${action}". Valid actions: start, pause, resume, stop, set_speed.`);
+      }
+    },
+
+    // 8. GET EDITOR DRAFT (Read into Agent LLM Context)
+    {
+      name: 'get_editor_draft',
+      description: 'Reads the active composer draft (headline, raw content notes, category, tags, and word count) into the agent context window.',
+      inputSchema: {
+        type: 'object',
+        properties: {}
+      },
+      annotations: {
+        readOnlyHint: true,
+      },
+      execute: async () => {
+        const store = useStore.getState();
+        const draft = store.editorDraft;
+        const wordCount = draft.content ? draft.content.trim().split(/\s+/).filter(Boolean).length : 0;
+        return {
+          title: draft.title || '',
+          content: draft.content || '',
+          category: draft.category,
+          tags: draft.tags,
+          authorName: draft.authorName,
+          wordCount,
+          hasDraft: Boolean(draft.content && draft.content.trim().length > 0),
+        };
+      }
+    },
+
+    // 9. PROPOSE EDITOR EXPANSION (Binary Gatekeeper Review Trigger)
+    {
+      name: 'propose_editor_expansion',
+      description: 'Injects an expanded, structured article draft directly into the author\'s editor and immediately opens the Zero-Cursor Binary Gatekeeper Review Modal on screen.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          proposal: {
+            type: 'string',
+            description: 'The expanded, fluent prose or structured article to present to the user for binary keyboard review.'
+          },
+          title: {
+            type: 'string',
+            description: 'Suggested title for the article (optional).'
+          }
+        },
+        required: ['proposal']
+      },
+      // Deliberately OMIT readOnlyHint: Mutates visible UI / opens review modal
+      execute: async ({ proposal, title }: { proposal: string; title?: string }) => {
+        if (!proposal || proposal.trim().length < 5) {
+          throw new Error('Proposal must contain at least 5 characters.');
+        }
+        const store = useStore.getState();
+        store.proposeEditorDraft({ proposedText: proposal, proposedTitle: title });
+        return {
+          success: true,
+          message: 'Proposal injected into editor and Binary Gatekeeper Review Modal displayed on screen.',
+        };
+      }
+    },
+
+    // 10. INSERT PULL QUOTE
+    {
+      name: 'insert_pull_quote',
+      description: 'Inserts an accessible, formatted pull quote with attribution into the active article draft for cognitive emphasis without visual clutter.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          quote: {
+            type: 'string',
+            description: 'The memorable or emphasized quote statement to highlight.'
+          },
+          attribution: {
+            type: 'string',
+            description: 'The speaker, source, or author attribution (optional).'
+          }
+        },
+        required: ['quote']
+      },
+      // Deliberately OMIT readOnlyHint: Mutates editor text
+      execute: async ({ quote, attribution }: { quote: string; attribution?: string }) => {
+        if (!quote || quote.trim().length < 3) {
+          throw new Error('Quote must contain at least 3 characters.');
+        }
+        const store = useStore.getState();
+        store.insertPullQuote(quote, attribution);
+        return {
+          success: true,
+          message: 'Pull quote formatted and appended to active draft.',
+        };
+      }
+    },
+
+    // 11. PEEK ARTICLE (Zero-Disorientation Modal)
+    {
+      name: 'peek_article',
+      description: 'Opens the centered Zero-Disorientation Quick Peek modal for an article, allowing the user to preview takeaways without losing their place on the feed.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          articleId: {
+            type: 'string',
+            description: 'The ID of the article to preview (e.g., "seed-001", "seed-002").'
+          }
+        },
+        required: ['articleId']
+      },
+      // Deliberately OMIT readOnlyHint: Mutates visible DOM / opens modal
+      execute: async ({ articleId }: { articleId: string }) => {
+        if (!articleId) throw new Error('Article ID is required.');
+        const store = useStore.getState();
+        store.setPeekArticleId(articleId);
+        store.showToast(`✓ Quick Peek opened for article ${articleId}`);
+        store.setMascotMood('nodding');
+        setTimeout(() => store.setMascotMood('idle'), 2000);
+        return {
+          success: true,
+          articleId,
+          message: `Quick Peek preview opened on screen for article ${articleId}.`,
+        };
+      }
+    },
+
+    // 12. CLOSE PEEK
+    {
+      name: 'close_peek',
+      description: 'Closes the active Zero-Disorientation Quick Peek modal or drawer.',
+      inputSchema: {
+        type: 'object',
+        properties: {}
+      },
+      // Deliberately OMIT readOnlyHint: Mutates visible UI
+      execute: async () => {
+        const store = useStore.getState();
+        store.setPeekArticleId(null);
+        return {
+          success: true,
+          message: 'Quick Peek modal closed.',
+        };
       }
     },
   ];

@@ -5,8 +5,9 @@ import { ArticleDetail } from '@/types';
 import { useStore } from '@/lib/store/useStore';
 import { BionicText } from '@/components/accessibility/BionicText';
 import { SimplifiedBanner } from './SimplifiedBanner';
-import { Volume2, VolumeX, Clock, Heart } from 'lucide-react';
+import { Volume2, VolumeX, Clock, Heart, Eye } from 'lucide-react';
 import { getClarityTagStyle } from '@/lib/utils/a11y-metrics';
+import { extractCleanText } from '@/lib/utils/rsvp';
 
 interface ReadingCanvasProps {
   article: ArticleDetail;
@@ -17,6 +18,7 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
   const setActiveArticle = useStore((state) => state.setActiveArticle);
   const simplifiedView = useStore((state) => state.simplifiedView);
   const setSimplifiedView = useStore((state) => state.setSimplifiedView);
+  const openFocalReader = useStore((state) => state.openFocalReader);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [likes, setLikes] = useState(article.likesCount || 1);
   const [hasLiked, setHasLiked] = useState(false);
@@ -123,24 +125,44 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
             <span style={{ color: 'var(--canvas-muted)' }} className="capitalize">{article.category}</span>
           </div>
 
-          <button
-            onClick={toggleSpeech}
-            className="touch-target px-4 py-1.5 rounded-full font-bold text-xs bg-brand-surface-elevated hover:bg-brand-border-warm text-brand-text border border-brand-border flex items-center gap-2 transition-all shadow-xs"
-            title="Read aloud with audio synthesis"
-            aria-label={isSpeaking ? 'Stop reading aloud' : 'Read article aloud'}
-          >
-            {isSpeaking ? (
-              <>
-                <VolumeX className="w-3.5 h-3.5 text-rose-500" />
-                <span>Stop Audio</span>
-              </>
-            ) : (
-              <>
-                <Volume2 className="w-3.5 h-3.5 text-brand-green" />
-                <span>Listen</span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Zero-Saccade Focal Reader Trigger */}
+            <button
+              onClick={() => {
+                const textToRead = simplifiedView.isActive && simplifiedView.simplifiedContent
+                  ? simplifiedView.simplifiedContent
+                  : article.content.rawMarkdown;
+                const clean = extractCleanText(textToRead);
+                openFocalReader(clean, 250);
+              }}
+              className="touch-target px-3.5 py-1.5 rounded-full font-bold text-xs bg-brand-green-muted text-brand-green-text hover:bg-brand-green hover:text-white border border-brand-green/30 flex items-center gap-1.5 transition-all shadow-xs"
+              title="Fixed-gaze reading to reduce ocular strain and cognitive fatigue"
+              aria-label="Launch Zero-Saccade Focal Reader"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Zero-Saccade Reader</span>
+              <span className="sm:hidden">Focal Read</span>
+            </button>
+
+            <button
+              onClick={toggleSpeech}
+              className="touch-target px-4 py-1.5 rounded-full font-bold text-xs bg-brand-surface-elevated hover:bg-brand-border-warm text-brand-text border border-brand-border flex items-center gap-2 transition-all shadow-xs"
+              title="Read aloud with audio synthesis"
+              aria-label={isSpeaking ? 'Stop reading aloud' : 'Read article aloud'}
+            >
+              {isSpeaking ? (
+                <>
+                  <VolumeX className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Stop Audio</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-3.5 h-3.5 text-brand-green" />
+                  <span>Listen</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Headline */}
@@ -225,6 +247,24 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
                 >
                   <BionicText text={cleanHeading} as="span" />
                 </h2>
+              );
+            }
+
+            const isQuote = para.startsWith('>');
+            if (isQuote) {
+              const cleanQuote = para.replace(/^>\s*/gm, '');
+              return (
+                <blockquote 
+                  key={idx} 
+                  className="my-6 pl-4 sm:pl-6 py-3 border-l-4 border-brand-green bg-brand-surface-elevated/60 rounded-r-2xl shadow-xs"
+                >
+                  <BionicText 
+                    text={cleanQuote} 
+                    as="div" 
+                    className="font-medium italic text-base sm:text-lg"
+                    style={{ color: 'var(--canvas-text)', lineHeight: currentLineHeight }}
+                  />
+                </blockquote>
               );
             }
 

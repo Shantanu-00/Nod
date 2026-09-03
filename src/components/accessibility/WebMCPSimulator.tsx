@@ -63,6 +63,29 @@ export function WebMCPSimulator() {
           articleId: activeArticle ? activeArticle.id : 'seed-001',
           content: 'This WebMCP simplified view made this article so much easier for me to digest!',
         };
+      } else if (currentTool.name === 'control_focal_reader') {
+        testInput = {
+          action: 'start',
+          wpm: 275,
+        };
+      } else if (currentTool.name === 'get_editor_draft') {
+        testInput = {};
+      } else if (currentTool.name === 'propose_editor_expansion') {
+        testInput = {
+          proposal: 'Sensory accommodations in modern workspaces reduce chronic cognitive fatigue. By pairing low-frequency brown noise with structured 25-minute focus blocks, individuals with ADHD can eliminate auditory overload and preserve working memory throughout the day.',
+          title: 'Sensory Accommodations for Cognitive Fatigue',
+        };
+      } else if (currentTool.name === 'insert_pull_quote') {
+        testInput = {
+          quote: "Focus isn't about working harder; it's about removing cognitive friction.",
+          attribution: 'Alex M. (NOD Author)',
+        };
+      } else if (currentTool.name === 'peek_article') {
+        testInput = {
+          articleId: 'seed-001',
+        };
+      } else if (currentTool.name === 'close_peek') {
+        testInput = {};
       }
 
       const result = await currentTool.execute(testInput);

@@ -11,7 +11,8 @@ import {
   ChevronDown,
   X,
   Sliders,
-  Check
+  Check,
+  Eye
 } from 'lucide-react';
 import { ContrastTheme, FontFamilyPreference } from '@/types';
 
@@ -22,6 +23,8 @@ export function AccessibilityDock() {
   const preferences = useStore((state) => state.readingPreferences);
   const setReadingPreferences = useStore((state) => state.setReadingPreferences);
   const announce = useStore((state) => state.announce);
+  const openFocalReader = useStore((state) => state.openFocalReader);
+  const activeArticle = useStore((state) => state.activeArticle);
 
   const themes: { id: ContrastTheme; label: string; bg: string; text: string }[] = [
     { id: 'soft-cream', label: 'Cream', bg: '#F7F5F0', text: '#191B1F' },
@@ -117,6 +120,22 @@ export function AccessibilityDock() {
             title={`Theme: ${preferences.contrastTheme} (Click to cycle)`}
           >
             <SunMedium className="w-4 h-4 text-brand-green" />
+          </button>
+
+          {/* Quick Zero-Saccade RSVP Focal Reader Trigger */}
+          <button
+            onClick={() => {
+              if (activeArticle) {
+                openFocalReader(activeArticle.content.rawMarkdown, 250);
+              } else {
+                openFocalReader();
+              }
+            }}
+            className="touch-target w-9 h-9 rounded-full text-brand-muted hover:text-brand-green hover:bg-brand-surface-elevated flex items-center justify-center transition-colors"
+            title="Zero-Saccade Reader: Fixed-gaze reading to eliminate ocular motor fatigue"
+            aria-label="Launch Zero-Saccade Focal Reader"
+          >
+            <Eye className="w-4 h-4" />
           </button>
 
           {/* Open Detailed Flyout Settings */}
@@ -332,6 +351,21 @@ export function AccessibilityDock() {
             className="p-1 text-brand-green"
           >
             <SunMedium className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => {
+              if (activeArticle) {
+                openFocalReader(activeArticle.content.rawMarkdown, 250);
+              } else {
+                openFocalReader();
+              }
+            }}
+            className="p-1 text-brand-muted hover:text-brand-green"
+            title="Launch Zero-Saccade Reader"
+            aria-label="Launch Zero-Saccade Reader"
+          >
+            <Eye className="w-4 h-4" />
           </button>
 
           <button onClick={() => setIsOpen(!isOpen)} className="p-1 text-brand-muted">

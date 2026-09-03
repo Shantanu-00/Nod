@@ -4,38 +4,42 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store/useStore';
 import { calculateReadingMetrics } from '@/lib/utils/a11y-metrics';
-import { Mic, MicOff, Sparkles, Send, User } from 'lucide-react';
+import { Mic, MicOff, Sparkles, Send, User, Quote, Bot } from 'lucide-react';
 import { BinaryReviewModal } from './BinaryReviewModal';
 
 export function AccessibleEditor() {
   const router = useRouter();
   const announce = useStore((state) => state.announce);
   const setMascotMood = useStore((state) => state.setMascotMood);
+  const editorDraft = useStore((state) => state.editorDraft);
+  const setEditorDraft = useStore((state) => state.setEditorDraft);
+  const proposeEditorDraft = useStore((state) => state.proposeEditorDraft);
+  const acceptEditorProposal = useStore((state) => state.acceptEditorProposal);
+  const rejectEditorProposal = useStore((state) => state.rejectEditorProposal);
+  const insertPullQuote = useStore((state) => state.insertPullQuote);
 
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [handle, setHandle] = useState('@curator');
-  const [authorName, setAuthorName] = useState('Alex M.');
-  const [category, setCategory] = useState<'strategies' | 'stories' | 'technology' | 'discussion'>('strategies');
-  const [tagsInput, setTagsInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
-  const [proposedText, setProposedText] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [tagsInput, setTagsInput] = useState(editorDraft.tags.join(', '));
 
   useEffect(() => {
     const savedTitle = sessionStorage.getItem('nod_draft_title');
     const savedContent = sessionStorage.getItem('nod_draft_content');
-    if (savedTitle) setTitle(savedTitle);
-    if (savedContent) setContent(savedContent);
+    if (savedTitle && !editorDraft.title) {
+      setEditorDraft({ title: savedTitle });
+    }
+    if (savedContent && !editorDraft.content) {
+      setEditorDraft({ content: savedContent });
+    }
   }, []);
 
   useEffect(() => {
-    sessionStorage.setItem('nod_draft_title', title);
-    sessionStorage.setItem('nod_draft_content', content);
-  }, [title, content]);
+    sessionStorage.setItem('nod_draft_title', editorDraft.title);
+    sessionStorage.setItem('nod_draft_content', editorDraft.content);
+  }, [editorDraft.title, editorDraft.content]);
 
-  const metrics = calculateReadingMetrics(content || 'Start typing...');
+  const metrics = calculateReadingMetrics(editorDraft.content || 'Start typing...');
 
   const toggleSpeechRecognition = () => {
     // @ts-ignore
@@ -66,7 +70,9 @@ export function AccessibleEditor() {
         for (let i = event.resultIndex; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
         }
-        setContent((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        setEditorDraft({
+          content: editorDraft.content ? `${editorDraft.content} ${transcript}` : transcript,
+        });
       };
 
       recognition.onerror = () => {
@@ -86,14 +92,14 @@ export function AccessibleEditor() {
   };
 
   const handleExpandIntent = async () => {
-    if (!content.trim()) return;
+    if (!editorDraft.content.trim()) return;
 
     setIsExpanding(true);
     setMascotMood('nodding');
     announce('Expanding shorthand thoughts into structured sentences...');
 
     try {
-      const lines = content.split('\n').filter(Boolean);
+      const lines = editorDraft.content.split('\n').filter(Boolean);
       const expandedLines = lines.map((line) => {
         const clean = line.replace(/^[-*•]\s*/, '').trim();
         const cap = clean.charAt(0).toUpperCase() + clean.slice(1);
@@ -101,7 +107,7 @@ export function AccessibleEditor() {
       });
 
       const proposal = expandedLines.join(' ');
-      setProposedText(proposal);
+      proposeEditorDraft({ proposedText: proposal });
     } finally {
       setIsExpanding(false);
       setMascotMood('idle');
@@ -110,7 +116,7 @@ export function AccessibleEditor() {
 
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) return;
+    if (!editorDraft.title.trim() || !editorDraft.content.trim()) return;
 
     setIsPublishing(true);
     announce('Publishing your article...');
@@ -122,19 +128,19 @@ export function AccessibleEditor() {
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean);
 
-      const formattedHandle = handle.startsWith('@') ? handle : `@${handle}`;
+      const formattedHandle = editorDraft.handle.startsWith('@') ? editorDraft.handle : `@${editorDraft.handle}`;
 
       const res = await fetch('/api/articles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: title.trim(),
-          content: content.trim(),
-          category,
+          title: editorDraft.title.trim(),
+          content: editorDraft.content.trim(),
+          category: editorDraft.category,
           tags,
           author: {
             id: 'user-active',
-            name: authorName.trim() || 'Community Contributor',
+            name: editorDraft.authorName.trim() || 'Community Contributor',
             handle: formattedHandle,
             badge: 'Author',
           },
@@ -144,6 +150,7 @@ export function AccessibleEditor() {
       if (res.ok) {
         sessionStorage.removeItem('nod_draft_title');
         sessionStorage.removeItem('nod_draft_content');
+        setEditorDraft({ title: '', content: '', proposedText: null });
         announce('Story published successfully!');
         router.push('/');
       }
@@ -157,17 +164,23 @@ export function AccessibleEditor() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 pb-24">
-      {/* Editorial Guidance */}
-      <div className="p-4 bg-brand-surface border border-brand-border rounded-2xl flex items-center justify-between gap-3 text-xs shadow-xs">
+      {/* Editorial Guidance & WebMCP Status */}
+      <div className="p-4 bg-brand-surface border border-brand-border rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-brand-green" />
           <span className="text-brand-text font-bold">
             Assisted Writing Studio (Low-Bandwidth Shorthand Engine)
           </span>
         </div>
-        <span className="text-brand-muted hidden sm:inline">
-          Type rough bullet points or fragments, and NOD expands them cleanly.
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-brand-muted hidden md:inline">
+            Type fragments; agent expands cleanly.
+          </span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-green-muted/60 border border-brand-green/20 text-[11px] font-bold text-brand-green">
+            <Bot className="w-3 h-3" />
+            <span>WebMCP Co-Author Connected</span>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handlePublish} className="space-y-4">
@@ -181,8 +194,8 @@ export function AccessibleEditor() {
               type="text"
               required
               placeholder="e.g. Jordan Rivera"
-              value={authorName}
-              onChange={(e) => setAuthorName(e.target.value)}
+              value={editorDraft.authorName}
+              onChange={(e) => setEditorDraft({ authorName: e.target.value })}
               className="w-full px-4 py-2 bg-brand-surface border border-brand-border rounded-xl text-xs sm:text-sm text-brand-text placeholder-brand-muted focus:outline-none focus:border-brand-green"
             />
           </div>
@@ -194,8 +207,8 @@ export function AccessibleEditor() {
               type="text"
               required
               placeholder="e.g. @jordan_r"
-              value={handle}
-              onChange={(e) => setHandle(e.target.value)}
+              value={editorDraft.handle}
+              onChange={(e) => setEditorDraft({ handle: e.target.value })}
               className="w-full px-4 py-2 bg-brand-surface border border-brand-border rounded-xl text-xs sm:text-sm text-brand-text placeholder-brand-muted focus:outline-none focus:border-brand-green"
             />
           </div>
@@ -211,8 +224,8 @@ export function AccessibleEditor() {
             type="text"
             required
             placeholder="e.g. How I organize tasks with ADHD-friendly spatial cues..."
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            value={editorDraft.title}
+            onChange={(e) => setEditorDraft({ title: e.target.value })}
             className="w-full px-4 py-3 bg-brand-surface border border-brand-border focus:border-brand-green rounded-2xl text-base sm:text-lg font-bold text-brand-text placeholder-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-green/20 shadow-xs"
           />
         </div>
@@ -226,9 +239,9 @@ export function AccessibleEditor() {
             <button
               type="button"
               key={cat}
-              onClick={() => setCategory(cat)}
+              onClick={() => setEditorDraft({ category: cat })}
               className={`touch-target px-3.5 py-1 text-xs rounded-full border transition-all ${
-                category === cat
+                editorDraft.category === cat
                   ? 'border-brand-green bg-brand-green text-white font-bold shadow-xs'
                   : 'border-brand-border bg-brand-surface text-brand-muted hover:text-brand-text'
               }`}
@@ -240,7 +253,7 @@ export function AccessibleEditor() {
 
         {/* Action Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={toggleSpeechRecognition}
@@ -258,12 +271,22 @@ export function AccessibleEditor() {
             <button
               type="button"
               onClick={handleExpandIntent}
-              disabled={isExpanding || !content.trim()}
+              disabled={isExpanding || !editorDraft.content.trim()}
               className="touch-target px-4 py-1.5 rounded-full text-xs font-bold bg-brand-green-muted hover:bg-brand-green hover:text-white text-brand-green-text border border-brand-green/20 flex items-center gap-1.5 transition-colors disabled:opacity-40"
               title="Expand telegraphic shorthand notes into fluent paragraphs"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>{isExpanding ? 'Expanding...' : 'Expand Notes with NOD'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => insertPullQuote("Focus isn't about working harder; it's about reducing visual and cognitive friction.", editorDraft.authorName)}
+              className="touch-target px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 border border-brand-border bg-brand-surface text-brand-text hover:bg-brand-surface-elevated transition-all"
+              title="Insert a formatted pull quote into draft"
+            >
+              <Quote className="w-3.5 h-3.5 text-brand-green" />
+              <span>+ Pull Quote</span>
             </button>
           </div>
 
@@ -279,8 +302,8 @@ export function AccessibleEditor() {
             required
             rows={10}
             placeholder="Type your ideas here. You can write in fragments, bullet points, or stream-of-consciousness..."
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
+            value={editorDraft.content}
+            onChange={(e) => setEditorDraft({ content: e.target.value })}
             className="w-full p-4 sm:p-5 bg-brand-surface border border-brand-border focus:border-brand-green rounded-2xl text-base text-brand-text placeholder-brand-muted focus:outline-none focus:ring-2 focus:ring-brand-green/20 leading-relaxed font-sans shadow-xs"
           />
         </div>
@@ -295,7 +318,12 @@ export function AccessibleEditor() {
             type="text"
             placeholder="adhd, focus, reading, accommodations"
             value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
+            onChange={(e) => {
+              setTagsInput(e.target.value);
+              setEditorDraft({
+                tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean),
+              });
+            }}
             className="w-full px-4 py-2.5 bg-brand-surface border border-brand-border rounded-xl text-xs text-brand-text placeholder-brand-muted focus:outline-none focus:border-brand-green shadow-xs"
           />
         </div>
@@ -304,7 +332,7 @@ export function AccessibleEditor() {
         <div className="flex items-center justify-end gap-3 pt-4">
           <button
             type="submit"
-            disabled={isPublishing || !title.trim() || !content.trim()}
+            disabled={isPublishing || !editorDraft.title.trim() || !editorDraft.content.trim()}
             className="touch-target px-7 py-3 bg-brand-green hover:bg-brand-green-hover text-white font-extrabold text-sm sm:text-base rounded-full flex items-center gap-2 shadow-sm transition-transform active:scale-95 disabled:opacity-40"
           >
             <Send className="w-4 h-4 fill-white" />
@@ -313,20 +341,13 @@ export function AccessibleEditor() {
         </div>
       </form>
 
-      {/* Binary Review Modal */}
-      {proposedText && (
+      {/* Binary Review Modal (Driven by WebMCP or In-App Expand) */}
+      {editorDraft.proposedText && (
         <BinaryReviewModal
-          original={content}
-          proposal={proposedText}
-          onAccept={(accepted) => {
-            setContent(accepted);
-            setProposedText(null);
-            announce('Accepted agent proposal.');
-          }}
-          onReject={() => {
-            setProposedText(null);
-            announce('Rejected proposal and kept original text.');
-          }}
+          original={editorDraft.content}
+          proposal={editorDraft.proposedText}
+          onAccept={() => acceptEditorProposal()}
+          onReject={() => rejectEditorProposal()}
         />
       )}
     </div>
