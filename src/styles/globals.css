@@ -1,0 +1,181 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Lexend:wght@300;400;500;600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* =========================================================================
+     SERENE SOCIAL PLATFORM DESIGN TOKENS
+     ========================================================================= */
+  --brand-bg: #F7F5F0;
+  --brand-surface: #FFFFFF;
+  --brand-surface-elevated: #FAF8F5;
+  --brand-border: rgba(0, 0, 0, 0.08);
+  --brand-border-warm: #EBE6DC;
+  --brand-text: #191B1F;
+  --brand-muted: #646A75;
+  
+  /* Natural Balanced Leaf Green */
+  --brand-green: #6E9924;
+  --brand-green-hover: #5F851E;
+  --brand-green-muted: #EFF6E6;
+  --brand-green-text: #2E5C1B;
+
+  /* Pillar Accents */
+  --pillar-read-bg: #EAF5ED;
+  --pillar-read-text: #257A3A;
+  --pillar-write-bg: #EBF2FB;
+  --pillar-write-text: #1E70D5;
+  --pillar-publish-bg: #F9EBF4;
+  --pillar-publish-text: #C02674;
+
+  /* Canvas Variables */
+  --canvas-bg: #F7F5F0;
+  --canvas-surface: #FFFFFF;
+  --canvas-text: #191B1F;
+  --canvas-muted: #646A75;
+  --canvas-border: rgba(0, 0, 0, 0.08);
+
+  /* Modern Social Default Font: Plus Jakarta Sans */
+  --font-canvas: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --letter-spacing-canvas: 0.01em;
+  --line-height-canvas: 1.7;
+  --font-size-canvas: 1.0625rem;
+  --max-reading-width: 68ch;
+}
+
+/* Custom Minimalist Scrollbars (Issue 1) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.28);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.16) transparent;
+}
+
+/* =========================================================================
+   ACCESSIBLE CANVAS PRESETS
+   ========================================================================= */
+
+.theme-soft-cream {
+  --canvas-bg: #F7F5F0;
+  --canvas-surface: #FFFFFF;
+  --canvas-text: #191B1F;
+  --canvas-muted: #646A75;
+  --canvas-border: rgba(0, 0, 0, 0.08);
+}
+
+.theme-warm-peach {
+  --canvas-bg: #FFF4EC;
+  --canvas-surface: #FFFBF8;
+  --canvas-text: #2B2320;
+  --canvas-muted: #72625C;
+  --canvas-border: rgba(180, 110, 80, 0.12);
+}
+
+.theme-calming-sage {
+  --canvas-bg: #F2F7F4;
+  --canvas-surface: #F9FCFA;
+  --canvas-text: #1B261E;
+  --canvas-muted: #56685B;
+  --canvas-border: rgba(60, 120, 80, 0.12);
+}
+
+.theme-muted-slate {
+  --canvas-bg: #16181F;
+  --canvas-surface: #20232B;
+  --canvas-text: #E4E7EE;
+  --canvas-muted: #9AA1B2;
+  --canvas-border: rgba(255, 255, 255, 0.08);
+}
+
+.theme-yellow-on-black {
+  --canvas-bg: #0C0D10;
+  --canvas-surface: #171820;
+  --canvas-text: #FDE047;
+  --canvas-muted: #CA8A04;
+  --canvas-border: rgba(253, 224, 71, 0.25);
+}
+
+/* Selectable Typeface Overrides */
+.font-pref-lexend {
+  --font-canvas: 'Lexend', sans-serif;
+}
+
+.font-pref-atkinson {
+  --font-canvas: 'Atkinson Hyperlegible', sans-serif;
+}
+
+.font-pref-opendyslexic {
+  --font-canvas: 'OpenDyslexic', 'Comic Sans MS', sans-serif;
+}
+
+.font-pref-system {
+  --font-canvas: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Base Body Styles */
+body {
+  background-color: var(--brand-bg);
+  color: var(--brand-text);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Adaptive Content Canvas Utility */
+.adaptive-canvas {
+  background-color: var(--canvas-surface);
+  color: var(--canvas-text);
+  font-family: var(--font-canvas);
+  letter-spacing: var(--letter-spacing-canvas);
+  line-height: var(--line-height-canvas);
+  font-size: var(--font-size-canvas);
+  transition: background-color 0.2s ease, color 0.2s ease, letter-spacing 0.15s ease, line-height 0.15s ease;
+}
+
+/* Bionic Saccadic Fixation */
+.bionic-fixation {
+  font-weight: 700;
+  color: inherit;
+}
+
+/* Tremor-Tolerant Interactive Targets (48px min) */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Clean Focus Ring */
+:focus-visible {
+  outline: 2.5px solid var(--brand-green) !important;
+  outline-offset: 2px !important;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
