@@ -1,0 +1,31 @@
+# Dependencies and package-manager files
+node_modules/
+.pnpm-store/
+.yarn/
+
+# Builds, coverage, caches, and logs
+dist/
+build/
+.next/
+.cache/
+coverage/
+*.log
+*.tsbuildinfo
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Local reference downloads and optional checked-out examples.
+# Refresh them with scripts/refresh-webmcp-docs.ps1; keep the repo status clean.
+docs/snapshots/
+.sources/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+test/

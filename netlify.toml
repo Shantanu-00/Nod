@@ -1,0 +1,16 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Security & WebMCP permissions headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Origin-Agent-Cluster = "?1"
+    Permissions-Policy = "tools=(self)"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
