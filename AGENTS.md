@@ -249,8 +249,8 @@ Every AI agent implementing WebMCP tools in this repository must implement these
 ```
 - **Output Standard**: Always return `{ query, resultCount, results: [...] }` so that an empty result (`resultCount: 0`) is explicitly recognized by the model rather than misinterpreted as an error.
 
-### Tool 5: `publish_post`
-- **Purpose**: Submits a new discussion thread or reply to the public feed.
+### Tool 5: `stage_and_publish_post` (alias: `publish_post` / `publish_article`)
+- **Purpose**: Prepares a post and mounts the on-screen Publishing Approval Card for human verification before persisting to Netlify Blobs.
 - **Type**: Mutation with External Side Effects.
 - **Annotations**: None (Deliberately omit `readOnlyHint` so browser agents require user verification).
 - **Schema**:
@@ -260,21 +260,40 @@ Every AI agent implementing WebMCP tools in this repository must implement these
   "properties": {
     "title": {
       "type": "string",
-      "description": "Title of the post (keep under 120 characters)."
+      "description": "Accessible title of the post (keep under 120 characters)."
     },
     "content": {
       "type": "string",
-      "description": "Body text of the post."
+      "description": "Richly structured markdown. MUST format with '## ' headers every 2-3 paragraphs, '**bold**' anchor concepts, '-' bullet points, and '>' quotes. Keep paragraphs under 3 sentences to prevent visual crowding."
     },
     "category": {
       "type": "string",
-      "enum": ["tips", "stories", "questions", "resources"],
-      "description": "Topic tag for the post."
+      "enum": ["strategies", "stories", "technology", "discussion"],
+      "description": "Topic category tag."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Topic tags (e.g. ['adhd', 'focus', 'reading'])."
     }
   },
   "required": ["title", "content", "category"]
 }
 ```
+
+---
+
+### 4.1. The AI Agent Formatting & Typography Standard (Serving Neurodivergent Readers)
+
+An agent connecting to NOD via WebMCP is not merely generating text; it is actively co-authoring for readers who struggle with visual crowding, photopic sensitivity, and working memory decay.
+
+**The Golden Rules for Agent-Generated Markdown:**
+1. **Never Output Dense Walls of Plain Text**: Unbroken paragraphs create "rivers of white" and visual distortions for dyslexic readers.
+2. **Spatial Landmark Headings (`## Section Title`)**: Insert an `##` heading every 2 to 3 paragraphs to provide clear visual and mental anchor points.
+3. **Anchor Bolding (`**key concept**`)**: Bold 2 to 4 critical anchor words per section. This mimics bionic reading fixation and helps readers maintain their saccadic scan path.
+4. **Working Memory Bullet Points (`- List item`)**: Multi-step strategies, takeaways, or recommendations must be rendered as bullet points rather than long compound sentences.
+5. **Pull Quotes (`> "Insight"`)**: Use markdown blockquotes to isolate memorable thoughts and emotional anchors.
+6. **Paragraph Budget**: Maximum 2 to 3 sentences per paragraph.
 
 ---
 

@@ -411,7 +411,7 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
           },
           proposal: {
             type: 'string',
-            description: 'Agent-generated expanded prose to present for human binary review.'
+            description: "Expanded prose structured in accessible markdown. Use '## ' headings, '**bold**' anchor concepts, short 2-3 sentence paragraphs, and bullet points to eliminate cognitive crowding."
           },
           title: {
             type: 'string',
@@ -433,7 +433,10 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
       inputSchema: {
         type: 'object',
         properties: {
-          proposal: { type: 'string', description: 'The expanded fluent prose.' },
+          proposal: { 
+            type: 'string', 
+            description: "The expanded fluent prose in accessible markdown. Use '## ' headings, '**bold**' key terms, and bulleted lists." 
+          },
           title: { type: 'string', description: 'Suggested title.' }
         },
         required: ['proposal']
@@ -443,7 +446,7 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
     // Alias: assist_draft_content
     {
       name: 'assist_draft_content',
-      description: 'Expands shorthand or phonetic text into clear sentences while preserving voice.',
+      description: 'Expands shorthand or phonetic text into clear sentences while preserving voice. Formats output with accessible markdown (##, **, -).',
       inputSchema: {
         type: 'object',
         properties: {
@@ -498,11 +501,11 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
         properties: {
           title: {
             type: 'string',
-            description: 'Title of the post (under 120 characters).'
+            description: 'Accessible title of the post (under 120 characters).'
           },
           content: {
             type: 'string',
-            description: 'Body markdown content of the post.'
+            description: "Richly structured markdown for neurodivergent readers. MUST use '## ' section headers every 2-3 paragraphs, '**bold**' on key anchor concepts, '-' for bullet lists, and '>' for quotes. Keep paragraphs under 3 sentences to avoid visual crowding."
           },
           category: {
             type: 'string',
@@ -522,12 +525,15 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
     // Alias: publish_article
     {
       name: 'publish_article',
-      description: 'Prepares and publishes an article to the community feed (stages for review by default).',
+      description: 'Prepares and publishes an article to the community feed (stages for review by default). Uses structured accessible markdown.',
       inputSchema: {
         type: 'object',
         properties: {
-          title: { type: 'string' },
-          content: { type: 'string' },
+          title: { type: 'string', description: 'Title of the post (under 120 characters).' },
+          content: { 
+            type: 'string', 
+            description: "Body markdown. MUST format with '## ' headers, '**bold**' anchor concepts, and '-' bullet lists for accessibility." 
+          },
           category: { type: 'string', enum: ['strategies', 'stories', 'technology', 'discussion'] },
           tags: { type: 'array', items: { type: 'string' } }
         },

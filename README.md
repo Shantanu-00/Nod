@@ -136,8 +136,10 @@ Judges can verify NOD’s WebMCP integration through **three distinct methods**:
      - ➔ *ChatGPT invokes `activate_rsvp_reader`, streaming words through the optical anchor.*
    - 🗣️ *"I have shorthand in the composer: 'wheelchair ramp too steep 15 deg'. Can you structure it into a discussion draft?"*
      - ➔ *ChatGPT invokes `structure_authoring_section`, presenting the Binary Gatekeeper Card.*
+   - 🗣️ *"Write and stage an article about sensory accommodations for neurodivergent focus. Structure it with ## section headings, **bold** key concepts, a bulleted list, and a pull quote."*
+     - ➔ *ChatGPT reads the on-page semantic guidelines and tool schema, invoking `stage_and_publish_post` with formatted accessible markdown. The on-screen Publishing Approval Card mounts with full markdown rendering and zero text clipping.*
    - 🗣️ *"Stage this post for me to review and publish to the strategies category."*
-     - ➔ *ChatGPT invokes `stage_and_publish_post`, mounting the on-screen Publishing Approval Card.*
+     - ➔ *ChatGPT invokes `stage_and_publish_post`, mounting the on-screen Publishing Approval Card for full human verification.*
 
 ### Method 3: Universal Built-in WebMCP DevTools Simulator (Any Browser)
 
