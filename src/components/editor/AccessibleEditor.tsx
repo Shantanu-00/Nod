@@ -17,6 +17,7 @@ export function AccessibleEditor() {
   const acceptEditorProposal = useStore((state) => state.acceptEditorProposal);
   const rejectEditorProposal = useStore((state) => state.rejectEditorProposal);
   const insertPullQuote = useStore((state) => state.insertPullQuote);
+  const stagePost = useStore((state) => state.stagePost);
 
   const [isRecording, setIsRecording] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
@@ -114,52 +115,23 @@ export function AccessibleEditor() {
     }
   };
 
-  const handlePublish = async (e: React.FormEvent) => {
+  const handlePublish = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editorDraft.title.trim() || !editorDraft.content.trim()) return;
 
-    setIsPublishing(true);
-    announce('Publishing your article...');
-    setMascotMood('nodding');
+    const tags = tagsInput
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
 
-    try {
-      const tags = tagsInput
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean);
-
-      const formattedHandle = editorDraft.handle.startsWith('@') ? editorDraft.handle : `@${editorDraft.handle}`;
-
-      const res = await fetch('/api/articles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: editorDraft.title.trim(),
-          content: editorDraft.content.trim(),
-          category: editorDraft.category,
-          tags,
-          author: {
-            id: 'user-active',
-            name: editorDraft.authorName.trim() || 'Community Contributor',
-            handle: formattedHandle,
-            badge: 'Author',
-          },
-        }),
-      });
-
-      if (res.ok) {
-        sessionStorage.removeItem('nod_draft_title');
-        sessionStorage.removeItem('nod_draft_content');
-        setEditorDraft({ title: '', content: '', proposedText: null });
-        announce('Story published successfully!');
-        router.push('/');
-      }
-    } catch (err) {
-      console.error('Publish error:', err);
-    } finally {
-      setIsPublishing(false);
-      setMascotMood('idle');
-    }
+    stagePost({
+      title: editorDraft.title.trim(),
+      content: editorDraft.content.trim(),
+      category: editorDraft.category,
+      tags,
+      authorName: editorDraft.authorName.trim() || 'Community Contributor',
+      handle: editorDraft.handle.trim() || '@community',
+    });
   };
 
   return (
@@ -336,7 +308,7 @@ export function AccessibleEditor() {
             className="touch-target px-7 py-3 bg-brand-green hover:bg-brand-green-hover text-white font-extrabold text-sm sm:text-base rounded-full flex items-center gap-2 shadow-sm transition-transform active:scale-95 disabled:opacity-40"
           >
             <Send className="w-4 h-4 fill-white" />
-            <span>{isPublishing ? 'Publishing...' : 'Publish Story'}</span>
+            <span>Review & Publish Story</span>
           </button>
         </div>
       </form>

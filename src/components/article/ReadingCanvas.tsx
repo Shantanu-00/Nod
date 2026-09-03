@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { ArticleDetail } from '@/types';
 import { useStore } from '@/lib/store/useStore';
-import { BionicText } from '@/components/accessibility/BionicText';
+import { AccessibleMarkdownContent, AccessibleInlineMarkdown } from '@/lib/utils/markdown';
 import { SimplifiedBanner } from './SimplifiedBanner';
-import { Volume2, VolumeX, Clock, Heart, Eye } from 'lucide-react';
+import { Volume2, VolumeX, Clock, Heart, Eye, Sparkles } from 'lucide-react';
 import { getClarityTagStyle } from '@/lib/utils/a11y-metrics';
 import { extractCleanText } from '@/lib/utils/rsvp';
 
@@ -18,7 +18,9 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
   const setActiveArticle = useStore((state) => state.setActiveArticle);
   const simplifiedView = useStore((state) => state.simplifiedView);
   const setSimplifiedView = useStore((state) => state.setSimplifiedView);
+  const toggleSimplified = useStore((state) => state.toggleSimplifiedView);
   const openFocalReader = useStore((state) => state.openFocalReader);
+  const showToast = useStore((state) => state.showToast);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [likes, setLikes] = useState(article.likesCount || 1);
   const [hasLiked, setHasLiked] = useState(false);
@@ -30,6 +32,12 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
       setSimplifiedView({
         simplifiedContent: article.content.agentSummary,
         keyTakeaways: article.content.keyTakeaways || [],
+        isActive: false,
+      });
+    } else {
+      setSimplifiedView({
+        simplifiedContent: undefined,
+        keyTakeaways: [],
         isActive: false,
       });
     }
@@ -59,14 +67,32 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
     setIsSpeaking(true);
   };
 
+  const handleRequestSimplification = () => {
+    // Generate a clean sentence-shortened plain English version from the raw markdown
+    const sentences = article.content.rawMarkdown
+      .replace(/^#+\s+/gm, '')
+      .replace(/^>\s+/gm, '')
+      .split(/(?<=[.?!])\s+/)
+      .filter((s) => s.trim().length > 15);
+
+    const simplifiedText = sentences.slice(0, Math.min(6, sentences.length)).join(' ');
+    const takeaways = [
+      'Focuses on key concepts with reduced sentence complexity.',
+      'Designed to reduce cognitive load and visual fatigue.',
+      'Original phrasing preserved in the full text view.',
+    ];
+
+    setSimplifiedView({
+      simplifiedContent: simplifiedText,
+      keyTakeaways: takeaways,
+      isActive: true,
+    });
+    showToast('✨ Plain-English version rendered by NOD');
+  };
+
   const activeContent = simplifiedView.isActive && simplifiedView.simplifiedContent
     ? simplifiedView.simplifiedContent
     : article.content.rawMarkdown;
-
-  const paragraphs = activeContent
-    .split('\n\n')
-    .map((p) => p.trim())
-    .filter(Boolean);
 
   const landmarks = ['✦', '◈', '⬡', '❖', '▲'];
 
@@ -112,7 +138,7 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
           lineHeight: currentLineHeight,
         }}
       >
-        {/* Top Meta Bar */}
+        {/* Top Meta Bar with Action Controls */}
         <div 
           className="flex flex-wrap items-center justify-between gap-3 pb-6 mb-6 border-b text-xs"
           style={{ borderColor: 'var(--canvas-border)' }}
@@ -125,7 +151,57 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
             <span style={{ color: 'var(--canvas-muted)' }} className="capitalize">{article.category}</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* View Mode Switcher: Original vs Plain-English */}
+            {simplifiedView.simplifiedContent ? (
+              <div 
+                role="radiogroup" 
+                aria-label="Article Language Mode"
+                className="inline-flex p-0.5 rounded-full border text-xs font-semibold"
+                style={{
+                  backgroundColor: 'var(--canvas-bg)',
+                  borderColor: 'var(--canvas-border)',
+                }}
+              >
+                <button
+                  role="radio"
+                  aria-checked={!simplifiedView.isActive}
+                  onClick={() => simplifiedView.isActive && toggleSimplified()}
+                  className={`touch-target px-3 py-1 rounded-full transition-all text-xs ${
+                    !simplifiedView.isActive
+                      ? 'bg-brand-green text-white font-bold shadow-xs'
+                      : 'hover:opacity-80'
+                  }`}
+                  style={!simplifiedView.isActive ? {} : { color: 'var(--canvas-muted)' }}
+                >
+                  Original
+                </button>
+                <button
+                  role="radio"
+                  aria-checked={simplifiedView.isActive}
+                  onClick={() => !simplifiedView.isActive && toggleSimplified()}
+                  className={`touch-target px-3 py-1 rounded-full flex items-center gap-1.5 transition-all text-xs ${
+                    simplifiedView.isActive
+                      ? 'bg-brand-green text-white font-bold shadow-xs'
+                      : 'hover:opacity-80'
+                  }`}
+                  style={simplifiedView.isActive ? {} : { color: 'var(--canvas-muted)' }}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Plain-English</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleRequestSimplification}
+                className="touch-target px-3 py-1.5 rounded-full font-semibold text-xs border border-brand-green/40 text-brand-green hover:bg-brand-green/10 flex items-center gap-1.5 transition-all shadow-xs"
+                title="Generate a short-sentence, plain-English summary"
+              >
+                <Sparkles className="w-3 h-3 text-brand-green" />
+                <span>Simplify Text</span>
+              </button>
+            )}
+
             {/* Zero-Saccade Focal Reader Trigger */}
             <button
               onClick={() => {
@@ -144,16 +220,21 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
               <span className="sm:hidden">Focal Read</span>
             </button>
 
+            {/* Audio Synthesis Trigger */}
             <button
               onClick={toggleSpeech}
-              className="touch-target px-4 py-1.5 rounded-full font-bold text-xs bg-brand-surface-elevated hover:bg-brand-border-warm text-brand-text border border-brand-border flex items-center gap-2 transition-all shadow-xs"
+              className="touch-target px-3.5 py-1.5 rounded-full font-bold text-xs hover:bg-black/5 dark:hover:bg-white/5 border flex items-center gap-1.5 transition-all shadow-xs"
+              style={{
+                borderColor: 'var(--canvas-border)',
+                color: 'var(--canvas-text)',
+              }}
               title="Read aloud with audio synthesis"
               aria-label={isSpeaking ? 'Stop reading aloud' : 'Read article aloud'}
             >
               {isSpeaking ? (
                 <>
                   <VolumeX className="w-3.5 h-3.5 text-rose-500" />
-                  <span>Stop Audio</span>
+                  <span>Stop</span>
                 </>
               ) : (
                 <>
@@ -174,7 +255,7 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
             letterSpacing: currentSpacing,
           }}
         >
-          <BionicText text={article.title} as="span" />
+          <AccessibleInlineMarkdown text={article.title} isBionic={preferences.bionicReading} />
         </h1>
 
         {/* Author Header */}
@@ -221,73 +302,27 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
           </div>
         </div>
 
-        {/* In-Place Plain English Simplification Switch */}
+        {/* Collapsible Key Takeaways (Zero roadblock, minimal height) */}
         <SimplifiedBanner />
 
-        {/* Article Content Body (Obeys Font, Spacing, and Line Height Dynamically) */}
+        {/* Article Content Body with Full Markdown Support */}
         <div 
-          className="space-y-6 text-base sm:text-lg"
           style={{
             letterSpacing: currentSpacing,
             lineHeight: currentLineHeight,
             fontFamily: currentFontFamily,
           }}
         >
-          {paragraphs.map((para, idx) => {
-            const isHeading = para.startsWith('#');
-            const landmark = landmarks[idx % landmarks.length];
-
-            if (isHeading) {
-              const cleanHeading = para.replace(/^#+\s*/, '');
-              return (
-                <h2 
-                  key={idx} 
-                  className="text-xl sm:text-2xl font-bold mt-8 mb-3"
-                  style={{ color: 'var(--canvas-text)' }}
-                >
-                  <BionicText text={cleanHeading} as="span" />
-                </h2>
-              );
-            }
-
-            const isQuote = para.startsWith('>');
-            if (isQuote) {
-              const cleanQuote = para.replace(/^>\s*/gm, '');
-              return (
-                <blockquote 
-                  key={idx} 
-                  className="my-6 pl-4 sm:pl-6 py-3 border-l-4 border-brand-green bg-brand-surface-elevated/60 rounded-r-2xl shadow-xs"
-                >
-                  <BionicText 
-                    text={cleanQuote} 
-                    as="div" 
-                    className="font-medium italic text-base sm:text-lg"
-                    style={{ color: 'var(--canvas-text)', lineHeight: currentLineHeight }}
-                  />
-                </blockquote>
-              );
-            }
-
-            return (
-              <div key={idx} className="relative group">
-                <span 
-                  className="hidden md:block absolute -left-7 top-1 text-xs text-brand-green opacity-40 group-hover:opacity-100 select-none font-mono"
-                  title="Visual landmark anchor"
-                  aria-hidden="true"
-                >
-                  {landmark}
-                </span>
-
-                <BionicText 
-                  text={para} 
-                  as="p" 
-                  style={{ color: 'var(--canvas-text)', lineHeight: currentLineHeight }}
-                />
-              </div>
-            );
-          })}
+          <AccessibleMarkdownContent 
+            content={activeContent} 
+            isBionic={preferences.bionicReading}
+            lineHeight={currentLineHeight}
+            letterSpacing={currentSpacing}
+            landmarks={landmarks}
+          />
         </div>
       </article>
     </div>
   );
 }
+

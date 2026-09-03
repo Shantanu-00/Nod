@@ -14,12 +14,17 @@ interface BionicTextProps {
 export function BionicText({ text, as: Component = 'p', className = '', style }: BionicTextProps) {
   const isBionic = useStore((state) => state.readingPreferences.bionicReading);
 
-  if (!isBionic || !text) {
-    return <Component className={className} style={style}>{text}</Component>;
+  if (!text) return null;
+
+  // Sanitize heading hashes and asterisks so they never leak as raw syntax
+  const cleanText = text.replace(/^#{1,6}\s+/, '').replace(/\*\*/g, '');
+
+  if (!isBionic) {
+    return <Component className={className} style={style}>{cleanText}</Component>;
   }
 
   // Split by whitespace preserving tokens
-  const words = text.split(/(\s+)/);
+  const words = cleanText.split(/(\s+)/);
 
   return (
     <Component className={className} style={style}>

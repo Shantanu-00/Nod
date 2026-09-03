@@ -25,6 +25,7 @@ export function AccessibilityDock() {
   const announce = useStore((state) => state.announce);
   const openFocalReader = useStore((state) => state.openFocalReader);
   const activeArticle = useStore((state) => state.activeArticle);
+  const showToast = useStore((state) => state.showToast);
 
   const themes: { id: ContrastTheme; label: string; bg: string; text: string }[] = [
     { id: 'soft-cream', label: 'Cream', bg: '#F7F5F0', text: '#191B1F' },
@@ -128,12 +129,17 @@ export function AccessibilityDock() {
               if (activeArticle) {
                 openFocalReader(activeArticle.content.rawMarkdown, 250);
               } else {
-                openFocalReader();
+                showToast('Please open any story first to launch the Focal Reader');
+                announce('Please open any story first to launch the Zero-Saccade Focal Reader.');
               }
             }}
-            className="touch-target w-9 h-9 rounded-full text-brand-muted hover:text-brand-green hover:bg-brand-surface-elevated flex items-center justify-center transition-colors"
-            title="Zero-Saccade Reader: Fixed-gaze reading to eliminate ocular motor fatigue"
-            aria-label="Launch Zero-Saccade Focal Reader"
+            className={`touch-target w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+              activeArticle 
+                ? 'text-brand-muted hover:text-brand-green hover:bg-brand-surface-elevated' 
+                : 'text-brand-muted/40 cursor-not-allowed'
+            }`}
+            title={activeArticle ? "Launch Zero-Saccade Focal Reader" : "Open any story to launch Zero-Saccade Reader"}
+            aria-label={activeArticle ? "Launch Zero-Saccade Focal Reader" : "Open any story to launch Zero-Saccade Reader"}
           >
             <Eye className="w-4 h-4" />
           </button>
@@ -358,12 +364,13 @@ export function AccessibilityDock() {
               if (activeArticle) {
                 openFocalReader(activeArticle.content.rawMarkdown, 250);
               } else {
-                openFocalReader();
+                showToast('Please open any story first to launch the Focal Reader');
+                announce('Please open any story first to launch the Zero-Saccade Focal Reader.');
               }
             }}
-            className="p-1 text-brand-muted hover:text-brand-green"
-            title="Launch Zero-Saccade Reader"
-            aria-label="Launch Zero-Saccade Reader"
+            className={`p-1 ${activeArticle ? 'text-brand-muted hover:text-brand-green' : 'text-brand-muted/40 cursor-not-allowed'}`}
+            title={activeArticle ? "Launch Zero-Saccade Reader" : "Open any story to launch Zero-Saccade Reader"}
+            aria-label={activeArticle ? "Launch Zero-Saccade Reader" : "Open any story to launch Zero-Saccade Reader"}
           >
             <Eye className="w-4 h-4" />
           </button>

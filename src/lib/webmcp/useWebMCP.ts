@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { useStore } from '@/lib/store/useStore';
-import { createCanonicalWebMCPTools } from './tools';
+import { getViewScopedTools, createCanonicalWebMCPTools } from './tools';
 import { registerWebMCPTools, isWebMCPSupported } from './register';
 
 export function useWebMCP() {
+  const pathname = usePathname() || '/';
   const setWebMCPStatus = useStore((state) => state.setWebMCPStatus);
   const isWebMCPAvailable = useStore((state) => state.isWebMCPAvailable);
   const registeredToolCount = useStore((state) => state.registeredToolCount);
@@ -13,17 +15,22 @@ export function useWebMCP() {
 
   useEffect(() => {
     const supported = isWebMCPSupported();
-    const tools = createCanonicalWebMCPTools();
+    const activeTools = getViewScopedTools(pathname);
 
     if (!supported) {
-      setWebMCPStatus(false, tools.length);
+      setWebMCPStatus(false, activeTools.length);
       return;
+    }
+
+    // Abort previous route's registered tools before mounting the new view scope
+    if (controllerRef.current) {
+      controllerRef.current.abort();
     }
 
     controllerRef.current = new AbortController();
     const signal = controllerRef.current.signal;
 
-    registerWebMCPTools(tools, signal).then((count) => {
+    registerWebMCPTools(activeTools, signal).then((count) => {
       setWebMCPStatus(true, count);
     });
 
@@ -32,11 +39,12 @@ export function useWebMCP() {
         controllerRef.current.abort();
       }
     };
-  }, [setWebMCPStatus]);
+  }, [pathname, setWebMCPStatus]);
 
   return {
     isSupported: isWebMCPAvailable,
     toolCount: registeredToolCount,
     tools: createCanonicalWebMCPTools(),
+    activeScopedTools: getViewScopedTools(pathname),
   };
 }

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { CommentItem } from '@/types';
 import { MessageSquare, Send } from 'lucide-react';
 import { useStore } from '@/lib/store/useStore';
+import { BionicText } from '@/components/accessibility/BionicText';
 
 interface CommentSectionProps {
   articleId: string;
@@ -15,7 +16,26 @@ export function CommentSection({ articleId }: CommentSectionProps) {
   const [newComment, setNewComment] = useState('');
   const [authorName, setAuthorName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const announce = useStore((state) => state.announce);
+  const showToast = useStore((state) => state.showToast);
+  const preferences = useStore((state) => state.readingPreferences);
+
+  const letterSpacingMap = {
+    normal: '0.01em',
+    wide: '0.08em',
+    'extra-wide': '0.16em',
+  };
+
+  const fontFamilyMap = {
+    system: "'Plus Jakarta Sans', sans-serif",
+    lexend: "'Lexend', sans-serif",
+    atkinson: "'Atkinson Hyperlegible', sans-serif",
+    opendyslexic: "'OpenDyslexic', 'Comic Sans MS', sans-serif",
+  };
+
+  const currentSpacing = letterSpacingMap[preferences.letterSpacing] || '0.01em';
+  const currentFontFamily = fontFamilyMap[preferences.fontFamily] || fontFamilyMap.system;
 
   const fetchComments = useCallback(async () => {
     try {
@@ -60,6 +80,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
       if (res.ok) {
         setNewComment('');
         announce('Your comment has been posted.');
+        showToast('✓ Comment published to discussion');
         fetchComments();
       }
     } catch (err) {
@@ -70,22 +91,48 @@ export function CommentSection({ articleId }: CommentSectionProps) {
   };
 
   return (
-    <section className="mt-8 max-w-[72ch] mx-auto space-y-6" aria-label="Community Comments">
-      <div className="flex items-center gap-2 pb-3 border-b border-brand-border">
+    <section 
+      className="mt-8 max-w-[72ch] mx-auto space-y-6 transition-colors"
+      style={{
+        fontFamily: currentFontFamily,
+        letterSpacing: currentSpacing,
+      }}
+      aria-label="Community Comments"
+    >
+      <div 
+        className="flex items-center gap-2 pb-3 border-b"
+        style={{ borderColor: 'var(--canvas-border)' }}
+      >
         <MessageSquare className="w-5 h-5 text-brand-green" />
-        <h3 className="text-lg font-bold text-brand-text">Community Discussion</h3>
-        <span className="text-xs text-brand-muted font-medium">({comments.length})</span>
+        <h3 className="text-lg font-bold" style={{ color: 'var(--canvas-text)' }}>
+          Community Discussion
+        </h3>
+        <span className="text-xs font-medium" style={{ color: 'var(--canvas-muted)' }}>
+          ({comments.length})
+        </span>
       </div>
 
       {/* New Comment Input */}
-      <form onSubmit={handleSubmit} className="p-4 bg-brand-surface border border-brand-border rounded-2xl space-y-3 shadow-xs">
+      <form 
+        onSubmit={handleSubmit} 
+        className="p-5 rounded-3xl border space-y-3 shadow-xs transition-all"
+        style={{
+          backgroundColor: 'var(--canvas-surface)',
+          borderColor: 'var(--canvas-border)',
+        }}
+      >
         <div className="flex gap-2">
           <input
             type="text"
             placeholder="Your name or handle (optional)"
             value={authorName}
             onChange={(e) => setAuthorName(e.target.value)}
-            className="flex-1 max-w-xs px-3 py-1.5 bg-brand-surface-elevated border border-brand-border rounded-xl text-xs text-brand-text placeholder-brand-muted focus:outline-none focus:border-brand-green"
+            className="flex-1 max-w-xs px-3 py-1.5 border rounded-xl text-xs focus:outline-none focus:border-brand-green"
+            style={{
+              backgroundColor: 'var(--canvas-bg)',
+              borderColor: 'var(--canvas-border)',
+              color: 'var(--canvas-text)',
+            }}
           />
         </div>
         <textarea
@@ -93,7 +140,12 @@ export function CommentSection({ articleId }: CommentSectionProps) {
           placeholder="Share an accommodation tip, reaction, or encouragement..."
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
-          className="w-full p-3 bg-brand-surface-elevated border border-brand-border focus:border-brand-green rounded-xl text-xs sm:text-sm text-brand-text placeholder-brand-muted focus:outline-none focus:ring-1 focus:ring-brand-green resize-none leading-relaxed"
+          className="w-full p-3 border rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-brand-green resize-none leading-relaxed"
+          style={{
+            backgroundColor: 'var(--canvas-bg)',
+            borderColor: 'var(--canvas-border)',
+            color: 'var(--canvas-text)',
+          }}
           required
         />
         <div className="flex justify-end">
@@ -111,19 +163,41 @@ export function CommentSection({ articleId }: CommentSectionProps) {
       {/* Comments Stream */}
       <div className="space-y-3">
         {loading ? (
-          <div className="h-16 bg-brand-surface rounded-xl animate-pulse" />
+          <div 
+            className="h-16 rounded-2xl animate-pulse border" 
+            style={{
+              backgroundColor: 'var(--canvas-surface)',
+              borderColor: 'var(--canvas-border)',
+            }}
+          />
         ) : comments.length === 0 ? (
-          <p className="text-xs text-brand-muted italic">No comments yet. Start the conversation!</p>
+          <p className="text-xs italic" style={{ color: 'var(--canvas-muted)' }}>
+            No comments yet. Start the conversation!
+          </p>
         ) : (
           comments.map((c) => (
-            <div key={c.id} className="p-4 bg-brand-surface border border-brand-border rounded-xl space-y-1.5 shadow-xs">
-              <div className="flex items-center justify-between text-xs text-brand-muted">
-                <span className="font-bold text-brand-text">{c.author.name}</span>
+            <div 
+              key={c.id} 
+              className="p-4 rounded-2xl border space-y-1.5 shadow-xs transition-all"
+              style={{
+                backgroundColor: 'var(--canvas-surface)',
+                borderColor: 'var(--canvas-border)',
+              }}
+            >
+              <div 
+                className="flex items-center justify-between text-xs"
+                style={{ color: 'var(--canvas-muted)' }}
+              >
+                <span className="font-bold" style={{ color: 'var(--canvas-text)' }}>
+                  {c.author.name}
+                </span>
                 <span className="text-[11px]">
                   {new Date(c.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-brand-text leading-relaxed">{c.content}</p>
+              <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--canvas-text)' }}>
+                <BionicText text={c.content} as="span" />
+              </p>
             </div>
           ))
         )}
@@ -131,3 +205,4 @@ export function CommentSection({ articleId }: CommentSectionProps) {
     </section>
   );
 }
+

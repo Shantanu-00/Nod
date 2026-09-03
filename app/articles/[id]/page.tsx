@@ -7,13 +7,14 @@ import { CommentSection } from '@/components/article/CommentSection';
 import { ArrowLeft } from 'lucide-react';
 
 interface ArticlePageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
-  const article = await getArticleById(params.id);
+  const { id } = await params;
+  const article = await getArticleById(id);
 
   if (!article) {
     notFound();

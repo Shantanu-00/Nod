@@ -6,7 +6,13 @@ export const metadata: Metadata = {
   title: 'NOD — Accessible Social Platform & WebMCP Agent Experience',
   description: 'Say less. Do more. An agent-native reading and publishing platform for individuals with dyslexia, ADHD, and motor impairments.',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon.png', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
   },
 };
 

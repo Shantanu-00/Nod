@@ -83,3 +83,14 @@ export interface SimplifiedView {
 }
 
 export type MascotMood = 'idle' | 'listening' | 'nodding' | 'completed';
+
+export interface StagedPost {
+  title: string;
+  content: string;
+  category: 'neurodiversity' | 'technology' | 'strategies' | 'stories' | 'discussion';
+  tags: string[];
+  authorName: string;
+  handle: string;
+  metrics: ReadingMetrics;
+  isSubmitting?: boolean;
+}

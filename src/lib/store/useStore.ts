@@ -3,9 +3,11 @@ import {
   ReadingPreferences, 
   SimplifiedView, 
   MascotMood, 
-  ArticleDetail 
+  ArticleDetail,
+  StagedPost 
 } from '@/types';
 import { tokenizeWords } from '@/lib/utils/rsvp';
+import { calculateReadingMetrics } from '@/lib/utils/a11y-metrics';
 
 interface AppState {
   // Reading & Ergonomics
@@ -83,6 +85,19 @@ interface AppState {
   acceptEditorProposal: () => void;
   rejectEditorProposal: () => void;
   insertPullQuote: (quote: string, attribution?: string) => void;
+  
+  // Two-Step Publishing Approval State & Human-in-the-Loop Actions
+  stagedPost: StagedPost | null;
+  stagePost: (post: {
+    title: string;
+    content: string;
+    category?: StagedPost['category'];
+    tags?: string[];
+    authorName?: string;
+    handle?: string;
+  }) => StagedPost;
+  confirmPublishStagedPost: () => Promise<{ success: boolean; id?: string; error?: string }>;
+  cancelStagedPost: () => void;
 }
 
 const defaultPreferences: ReadingPreferences = {
@@ -175,14 +190,14 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       focalReader: {
         isOpen: true,
-        isPlaying: true,
+        isPlaying: false,
         words,
         currentIndex: 0,
         wpm: targetWpm,
         rawText,
       },
     });
-    get().announce(`Zero-Saccade Focal Reader started at ${targetWpm} words per minute.`);
+    get().announce(`Zero-Saccade Focal Reader ready at ${targetWpm} words per minute. Press Space to start.`);
   },
   closeFocalReader: () => {
     set((state) => ({
@@ -328,5 +343,110 @@ export const useStore = create<AppState>((set, get) => ({
     get().showToast('✓ Pull quote inserted by NOD Agent');
     get().setMascotMood('nodding');
     setTimeout(() => get().setMascotMood('idle'), 1500);
+  },
+
+  // Two-Step Publishing Approval Flow
+  stagedPost: null,
+  stagePost: (post) => {
+    const cleanTitle = post.title.trim();
+    const cleanContent = post.content.trim();
+    const metrics = calculateReadingMetrics(cleanContent);
+    const category = post.category || 'strategies';
+    const tags = post.tags && post.tags.length > 0 ? post.tags : ['community', 'accessibility'];
+    const authorName = post.authorName || get().editorDraft.authorName || 'Community Contributor';
+    const handle = post.handle || get().editorDraft.handle || '@community';
+
+    const staged: StagedPost = {
+      title: cleanTitle,
+      content: cleanContent,
+      category,
+      tags,
+      authorName,
+      handle,
+      metrics,
+      isSubmitting: false,
+    };
+
+    set({ stagedPost: staged });
+    get().announce(`Post titled "${cleanTitle}" has been staged. Publishing Approval Card opened on screen. Press Enter to confirm.`);
+    get().showToast('📋 Post staged for review — Approval Card open');
+    get().setMascotMood('nodding');
+    setTimeout(() => get().setMascotMood('idle'), 2000);
+    return staged;
+  },
+
+  confirmPublishStagedPost: async () => {
+    const staged = get().stagedPost;
+    if (!staged) return { success: false, error: 'No post currently staged.' };
+
+    set((state) => ({
+      stagedPost: state.stagedPost ? { ...state.stagedPost, isSubmitting: true } : null,
+    }));
+    get().announce('Confirming publication and saving story to community feed...');
+
+    try {
+      const formattedHandle = staged.handle.startsWith('@') ? staged.handle : `@${staged.handle}`;
+      const res = await fetch('/api/articles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: staged.title,
+          content: staged.content,
+          category: staged.category,
+          tags: staged.tags,
+          author: {
+            id: 'author-user',
+            name: staged.authorName,
+            handle: formattedHandle,
+            badge: 'Author',
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to publish: HTTP ${res.status}`);
+      }
+
+      const result = await res.json();
+      set({
+        stagedPost: null,
+        editorDraft: {
+          title: '',
+          content: '',
+          category: 'strategies',
+          tags: [],
+          authorName: staged.authorName,
+          handle: staged.handle,
+          proposedText: null,
+          proposedTitle: null,
+        },
+      });
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('nod_draft_title');
+        sessionStorage.removeItem('nod_draft_content');
+        window.dispatchEvent(new CustomEvent('nod:feed-updated'));
+      }
+
+      get().announce(`Your story "${staged.title}" has been published successfully.`);
+      get().showToast(`✓ Published: "${staged.title}"`);
+      get().setMascotMood('completed');
+      setTimeout(() => get().setMascotMood('idle'), 3000);
+
+      return { success: true, id: result.id };
+    } catch (err: any) {
+      set((state) => ({
+        stagedPost: state.stagedPost ? { ...state.stagedPost, isSubmitting: false } : null,
+      }));
+      get().showToast(`Failed to publish: ${err.message}`);
+      get().announce('Publishing failed. Please try again.');
+      return { success: false, error: err.message };
+    }
+  },
+
+  cancelStagedPost: () => {
+    set({ stagedPost: null });
+    get().announce('Publication cancelled. Story retained in editor.');
+    get().showToast('Publication cancelled');
   },
 }));

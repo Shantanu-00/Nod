@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useTransition } from 'react';
 import { FeedItem } from '@/types';
 import { ArticleCard } from './ArticleCard';
-import { Search, Sparkles, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
+import { Search, Sparkles, SlidersHorizontal, ArrowUpDown, LayoutGrid, List } from 'lucide-react';
 
 export function FeedList() {
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -11,6 +11,7 @@ export function FeedList() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'latest' | 'clarity' | 'quick' | 'deep'>('latest');
+  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const [isPending, startTransition] = useTransition();
 
   const categories = [
@@ -70,32 +71,82 @@ export function FeedList() {
   return (
     <div className="space-y-6">
       {/* Category Navigation Bar & Search */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 pb-2 border-b border-brand-border">
+      <div 
+        className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 pb-2 border-b"
+        style={{ borderColor: 'var(--canvas-border)' }}
+      >
         {/* Category Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
           {categories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => handleCategoryChange(cat.id)}
-              className={`touch-target px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+              className={`touch-target px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
                 selectedCategory === cat.id
-                  ? 'bg-brand-text text-brand-surface font-bold shadow-xs'
-                  : 'bg-brand-surface border border-brand-border text-brand-muted hover:text-brand-text hover:bg-brand-surface-elevated'
+                  ? 'bg-brand-green text-white font-bold shadow-xs border-brand-green'
+                  : 'hover:opacity-80'
               }`}
+              style={selectedCategory === cat.id ? {} : {
+                backgroundColor: 'var(--canvas-surface)',
+                borderColor: 'var(--canvas-border)',
+                color: 'var(--canvas-text)',
+              }}
             >
               {cat.label}
             </button>
           ))}
         </div>
 
-        {/* Sort & Search Controls */}
-        <div className="flex items-center gap-2.5">
+        {/* Sort, View Density & Search Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* View Density Toggle */}
+          <div 
+            className="flex items-center p-0.5 rounded-full border shadow-xs" 
+            style={{ backgroundColor: 'var(--canvas-surface)', borderColor: 'var(--canvas-border)' }}
+            role="group"
+            aria-label="Feed display density"
+          >
+            <button
+              onClick={() => setDensity('comfortable')}
+              className={`touch-target p-1.5 rounded-full transition-all ${
+                density === 'comfortable' 
+                  ? 'bg-brand-green text-white shadow-xs' 
+                  : 'hover:opacity-80'
+              }`}
+              style={density === 'comfortable' ? {} : { color: 'var(--canvas-muted)' }}
+              title="Comfortable card view"
+              aria-label="Comfortable card view"
+              aria-pressed={density === 'comfortable'}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setDensity('compact')}
+              className={`touch-target p-1.5 rounded-full transition-all ${
+                density === 'compact' 
+                  ? 'bg-brand-green text-white shadow-xs' 
+                  : 'hover:opacity-80'
+              }`}
+              style={density === 'compact' ? {} : { color: 'var(--canvas-muted)' }}
+              title="Compact list view"
+              aria-label="Compact list view"
+              aria-pressed={density === 'compact'}
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
           {/* Sort Dropdown */}
           <div className="relative">
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="touch-target pl-3 pr-8 py-1.5 bg-brand-surface border border-brand-border rounded-full text-xs font-medium text-brand-text focus:outline-none focus:border-brand-green appearance-none cursor-pointer shadow-xs"
+              className="touch-target pl-3 pr-8 py-1.5 border rounded-full text-xs font-medium focus:outline-none focus:border-brand-green appearance-none cursor-pointer shadow-xs"
+              style={{
+                backgroundColor: 'var(--canvas-surface)',
+                borderColor: 'var(--canvas-border)',
+                color: 'var(--canvas-text)',
+              }}
               aria-label="Sort feed"
             >
               <option value="latest">Sort: Latest</option>
@@ -107,14 +158,19 @@ export function FeedList() {
           </div>
 
           {/* Search Box */}
-          <div className="relative flex-1 sm:w-60">
+          <div className="relative flex-1 sm:w-56">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-brand-muted" />
             <input
               type="text"
               placeholder="Search stories..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-brand-surface border border-brand-border focus:border-brand-green rounded-full text-xs text-brand-text placeholder-brand-muted focus:outline-none focus:ring-1 focus:ring-brand-green/30 shadow-xs"
+              className="w-full pl-9 pr-3 py-1.5 border focus:border-brand-green rounded-full text-xs placeholder-brand-muted focus:outline-none focus:ring-1 focus:ring-brand-green/30 shadow-xs"
+              style={{
+                backgroundColor: 'var(--canvas-surface)',
+                borderColor: 'var(--canvas-border)',
+                color: 'var(--canvas-text)',
+              }}
               aria-label="Search stories"
             />
           </div>
@@ -125,7 +181,7 @@ export function FeedList() {
       {loading || isPending ? (
         <div className="grid grid-cols-1 gap-4">
           {[1, 2, 3].map((n) => (
-            <div key={n} className="h-44 bg-brand-surface border border-brand-border rounded-3xl animate-pulse" />
+            <div key={n} className="h-28 bg-brand-surface border border-brand-border rounded-3xl animate-pulse" />
           ))}
         </div>
       ) : processedItems.length === 0 ? (
@@ -137,9 +193,9 @@ export function FeedList() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4">
+        <div className={density === 'compact' ? 'space-y-2.5' : 'grid grid-cols-1 gap-4'}>
           {processedItems.map((item) => (
-            <ArticleCard key={item.id} item={item} />
+            <ArticleCard key={item.id} item={item} density={density} />
           ))}
         </div>
       )}

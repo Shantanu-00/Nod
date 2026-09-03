@@ -26,21 +26,23 @@ export async function POST(request: NextRequest) {
       handle: '@community',
     };
 
+    const cleanMarkdown = content.trim();
+    const cleanSummary = body.summary || (cleanMarkdown.length > 160 
+      ? cleanMarkdown.slice(0, 160).replace(/[#*`_]/g, '').trim() + '...'
+      : cleanMarkdown.replace(/[#*`_]/g, '').trim());
+
     const article: ArticleDetail = {
       id,
       title: title.trim(),
-      summary: body.summary || content.trim().slice(0, 150) + '...',
+      summary: cleanSummary,
       author: authorObj,
       category,
       tags: Array.isArray(tags) ? tags : [],
       metrics,
       content: {
-        rawMarkdown: content.trim(),
-        agentSummary: body.agentSummary || content.trim().slice(0, 200) + '...',
-        keyTakeaways: body.keyTakeaways || [
-          'Direct community insight shared on NOD.',
-          'Written with low-bandwidth authoring mechanics.',
-        ],
+        rawMarkdown: cleanMarkdown,
+        agentSummary: body.agentSummary || undefined,
+        keyTakeaways: Array.isArray(body.keyTakeaways) && body.keyTakeaways.length > 0 ? body.keyTakeaways : [],
       },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

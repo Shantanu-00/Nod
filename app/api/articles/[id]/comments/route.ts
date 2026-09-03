@@ -7,10 +7,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const comments = await getCommentsForArticle(params.id);
+    const { id } = await params;
+    const comments = await getCommentsForArticle(id);
     return NextResponse.json({ comments });
   } catch (err: any) {
     return NextResponse.json(
@@ -22,9 +23,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const { content, author } = body;
 
@@ -37,7 +39,7 @@ export async function POST(
 
     const comment: CommentItem = {
       id: uuidv4(),
-      articleId: params.id,
+      articleId: id,
       content: content.trim(),
       author: author || { id: 'anon', name: 'Anonymous Reader' },
       createdAt: new Date().toISOString(),

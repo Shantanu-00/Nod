@@ -6,14 +6,16 @@ import { FeedItem } from '@/types';
 import { useStore } from '@/lib/store/useStore';
 import { BionicText } from '@/components/accessibility/BionicText';
 import { getClarityTagStyle } from '@/lib/utils/a11y-metrics';
-import { Clock, MessageSquare, Heart, Sparkles, ArrowRight, BookOpen } from 'lucide-react';
+import { Clock, MessageSquare, Heart, Sparkles, ArrowRight } from 'lucide-react';
 
 interface ArticleCardProps {
   item: FeedItem;
+  density?: 'comfortable' | 'compact';
 }
 
-export function ArticleCard({ item }: ArticleCardProps) {
+export function ArticleCard({ item, density = 'comfortable' }: ArticleCardProps) {
   const setPeekArticleId = useStore((state) => state.setPeekArticleId);
+  const preferences = useStore((state) => state.readingPreferences);
   const [likes, setLikes] = useState(item.likesCount || 0);
   const [hasLiked, setHasLiked] = useState(false);
 
@@ -30,8 +32,93 @@ export function ArticleCard({ item }: ArticleCardProps) {
     }
   };
 
+  const letterSpacingMap = {
+    normal: '0.01em',
+    wide: '0.08em',
+    'extra-wide': '0.16em',
+  };
+
+  const lineHeightMap = {
+    normal: '1.5',
+    relaxed: '1.8',
+    loose: '2.1',
+  };
+
+  const currentSpacing = letterSpacingMap[preferences.letterSpacing] || '0.01em';
+  const currentLineHeight = lineHeightMap[preferences.lineHeight] || '1.5';
+
+  if (density === 'compact') {
+    return (
+      <article 
+        className="group rounded-2xl p-3 sm:p-4 transition-all duration-150 hover:shadow-xs flex items-center justify-between gap-3 border"
+        style={{
+          backgroundColor: 'var(--canvas-surface)',
+          borderColor: 'var(--canvas-border)',
+          color: 'var(--canvas-text)',
+        }}
+      >
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border shrink-0 ${clarityStyle.bg} ${clarityStyle.text} ${clarityStyle.border}`}>
+            {item.metrics.clarityGrade}
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <h3 
+              className="text-sm sm:text-base font-bold truncate group-hover:text-brand-green transition-colors"
+              style={{
+                letterSpacing: currentSpacing,
+              }}
+            >
+              <Link href={`/articles/${item.id}`} className="hover:underline focus:outline-none focus:ring-2 focus:ring-brand-green rounded">
+                <BionicText text={item.title} as="span" />
+              </Link>
+            </h3>
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--canvas-muted)' }}>
+              <span>{item.author.name}</span>
+              <span>•</span>
+              <span className="capitalize">{item.category}</span>
+              <span>•</span>
+              <span>{item.metrics.deepReadMinutes}m read</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setPeekArticleId(item.id)}
+            className="touch-target px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors border"
+            style={{
+              backgroundColor: 'var(--canvas-bg)',
+              borderColor: 'var(--canvas-border)',
+              color: 'var(--canvas-text)',
+            }}
+            title="Open quick summary peek modal"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-brand-green" />
+            <span className="hidden sm:inline">Peek</span>
+          </button>
+
+          <Link
+            href={`/articles/${item.id}`}
+            className="touch-target px-3.5 py-1 rounded-full text-xs font-bold bg-brand-green-muted text-brand-green-text hover:bg-brand-green hover:text-white flex items-center gap-1 transition-all"
+          >
+            <span>Read</span>
+            <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+      </article>
+    );
+  }
+
   return (
-    <article className="group bg-brand-surface border border-brand-border hover:border-brand-border-warm rounded-3xl p-5 sm:p-7 transition-all duration-200 hover:shadow-md flex flex-col justify-between">
+    <article 
+      className="group rounded-3xl p-4 sm:p-5 transition-all duration-200 hover:shadow-sm flex flex-col justify-between border"
+      style={{
+        backgroundColor: 'var(--canvas-surface)',
+        borderColor: 'var(--canvas-border)',
+        color: 'var(--canvas-text)',
+      }}
+    >
       <div>
         {/* Author Header Bar */}
         <div className="flex items-center justify-between gap-3 mb-3">
@@ -40,7 +127,8 @@ export function ArticleCard({ item }: ArticleCardProps) {
               <img
                 src={item.author.avatar}
                 alt={item.author.name}
-                className="w-8 h-8 rounded-full object-cover border border-brand-border"
+                className="w-8 h-8 rounded-full object-cover border"
+                style={{ borderColor: 'var(--canvas-border)' }}
               />
             ) : (
               <div className="w-8 h-8 rounded-full bg-brand-green-muted text-brand-green font-bold text-xs flex items-center justify-center">
@@ -49,11 +137,15 @@ export function ArticleCard({ item }: ArticleCardProps) {
             )}
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-brand-text">{item.author.name}</span>
-                <span className="text-xs text-brand-muted font-medium">{item.author.handle || '@contributor'}</span>
+                <span className="text-xs font-bold" style={{ color: 'var(--canvas-text)' }}>
+                  {item.author.name}
+                </span>
+                <span className="text-xs font-medium" style={{ color: 'var(--canvas-muted)' }}>
+                  {item.author.handle || '@contributor'}
+                </span>
               </div>
               {item.author.badge && (
-                <span className="text-[10px] text-brand-muted font-medium">
+                <span className="text-[10px] font-medium" style={{ color: 'var(--canvas-muted)' }}>
                   {item.author.badge}
                 </span>
               )}
@@ -66,8 +158,15 @@ export function ArticleCard({ item }: ArticleCardProps) {
           </span>
         </div>
 
-        {/* Title */}
-        <h2 className="text-xl sm:text-2xl font-extrabold text-brand-text group-hover:text-brand-green transition-colors mb-2 tracking-tight leading-snug">
+        {/* Title (Obeys Font, Tracking, and Leading) */}
+        <h2 
+          className="text-xl sm:text-2xl font-extrabold group-hover:text-brand-green transition-colors mb-2 tracking-tight"
+          style={{
+            letterSpacing: currentSpacing,
+            lineHeight: currentLineHeight,
+            color: 'var(--canvas-text)',
+          }}
+        >
           <button
             onClick={() => setPeekArticleId(item.id)}
             className="text-left hover:underline focus:outline-none focus:ring-2 focus:ring-brand-green rounded"
@@ -77,25 +176,38 @@ export function ArticleCard({ item }: ArticleCardProps) {
           </button>
         </h2>
 
-        {/* Summary Synopsis */}
-        <p className="text-sm sm:text-base text-brand-muted leading-relaxed mb-4">
+        {/* Summary Synopsis (Obeys Font, Tracking, and Leading) */}
+        <p 
+          className="text-sm sm:text-base mb-4"
+          style={{
+            letterSpacing: currentSpacing,
+            lineHeight: currentLineHeight,
+            color: 'var(--canvas-muted)',
+          }}
+        >
           <BionicText text={item.summary} as="span" />
         </p>
       </div>
 
       <div>
         {/* Reading Pacing & Social Interaction Footer */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-brand-border text-xs text-brand-muted">
+        <div 
+          className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t text-xs"
+          style={{ 
+            borderColor: 'var(--canvas-border)',
+            color: 'var(--canvas-muted)',
+          }}
+        >
           {/* Pacing Info */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1" title="Estimated reading pace">
-              <Clock className="w-3.5 h-3.5 text-brand-muted" />
+              <Clock className="w-3.5 h-3.5" />
               <span>Deep Read: {item.metrics.deepReadMinutes} min</span>
             </div>
 
             <span>•</span>
 
-            <div className="text-brand-muted hidden sm:inline">
+            <div className="hidden sm:inline">
               Skim: {item.metrics.skimMinutes} min
             </div>
 
@@ -103,7 +215,7 @@ export function ArticleCard({ item }: ArticleCardProps) {
             <button
               onClick={handleLike}
               className={`touch-target px-2 py-1 rounded-full flex items-center gap-1 transition-all ${
-                hasLiked ? 'text-rose-600 font-bold' : 'hover:text-brand-text'
+                hasLiked ? 'text-rose-600 font-bold' : 'hover:opacity-80'
               }`}
               title="Appreciate this story"
             >
@@ -123,7 +235,12 @@ export function ArticleCard({ item }: ArticleCardProps) {
             {/* Quick Peek (Opens centered modal) */}
             <button
               onClick={() => setPeekArticleId(item.id)}
-              className="touch-target px-3.5 py-1.5 rounded-full text-xs font-semibold bg-brand-surface-elevated hover:bg-brand-border-warm text-brand-text flex items-center gap-1.5 transition-colors border border-brand-border"
+              className="touch-target px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors border"
+              style={{
+                backgroundColor: 'var(--canvas-bg)',
+                borderColor: 'var(--canvas-border)',
+                color: 'var(--canvas-text)',
+              }}
               title="Open quick plain-language summary modal"
             >
               <Sparkles className="w-3.5 h-3.5 text-brand-green" />
