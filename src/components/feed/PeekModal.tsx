@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store/useStore';
 import { ArticleDetail } from '@/types';
 import { X, Sparkles, ArrowRight, Volume2, VolumeX, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { AccessibleInlineMarkdown } from '@/lib/utils/markdown';
 
 export function PeekModal() {
   const peekId = useStore((state) => state.peekArticleId);
@@ -181,9 +182,9 @@ export function PeekModal() {
                 <span>Plain-Language Takeaway</span>
                 <span className="text-[10px] text-brand-muted font-normal lowercase font-mono">render_simplified_view</span>
               </div>
-              <p className="text-sm text-brand-text leading-relaxed">
-                {liveSummary || article.content.agentSummary || article.summary}
-              </p>
+              <div className="text-sm text-brand-text leading-relaxed">
+                <AccessibleInlineMarkdown text={liveSummary || article.content.agentSummary || article.summary} />
+              </div>
             </div>
 
             {/* Bulleted Key Anchors */}

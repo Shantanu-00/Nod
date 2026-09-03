@@ -319,6 +319,7 @@ export function ReadingCanvas({ article }: ReadingCanvasProps) {
             lineHeight={currentLineHeight}
             letterSpacing={currentSpacing}
             landmarks={landmarks}
+            skipTitle={article.title}
           />
         </div>
       </article>
