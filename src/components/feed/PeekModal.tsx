@@ -89,7 +89,7 @@ export function PeekModal() {
         // If simplifiedView belongs to a different article, cleanly sync it
         const currentSimplified = useStore.getState().simplifiedView;
         if (currentSimplified.articleId !== peekId) {
-          if (data.content?.agentSummary) {
+          if (data.content?.agentSummary && data.content.agentSummary.length > 40) {
             setSimplifiedView({
               articleId: peekId,
               simplifiedContent: data.content.agentSummary,
@@ -97,11 +97,13 @@ export function PeekModal() {
               isActive: true,
             });
           } else {
+            // Automatically extract a dynamic cognitive summary so the modal NEVER displays a truncated 160-char stub!
+            const dynamic = extractDynamicSummary(data);
             setSimplifiedView({
               articleId: peekId,
-              simplifiedContent: '',
-              keyTakeaways: [],
-              isActive: false,
+              simplifiedContent: dynamic.summary,
+              keyTakeaways: dynamic.takeaways,
+              isActive: true,
             });
           }
         }

@@ -202,9 +202,10 @@ async function executeRenderContentPeek({
       ? store.simplifiedView.keyTakeaways
       : article?.content?.keyTakeaways || [],
     hasAgentSynthesis: hasLiveSynthesis || Boolean(article?.content?.agentSummary),
+    actionRequired: 'MANDATORY ACCESSIBILITY DIRECTIVE: DO NOT output the summary as text in the conversation chat. The user has dyslexia/reading fatigue and is looking at the browser interface. You MUST call the tool render_simplified_view({ simplifiedContent, keyTakeaways }) now to render your plain-language synthesis directly inside the on-screen modal.',
     message: hasLiveSynthesis
-      ? `Quick Peek opened with active plain-language synthesis for "${displayTitle}". You can refine it with render_simplified_view if desired.`
-      : `Quick Peek card opened on screen for "${displayTitle}". Full article markdown is returned above. You can now analyze it and call render_simplified_view({ simplifiedContent, keyTakeaways }) to layer a plain-language summary onto the user's screen.`,
+      ? `Quick Peek opened with active plain-language synthesis for "${displayTitle}". You can update it with render_simplified_view.`
+      : `Quick Peek card opened on screen for "${displayTitle}". Call render_simplified_view({ simplifiedContent, keyTakeaways }) now to display your synthesis on the user's screen.`,
   };
 }
 
@@ -438,7 +439,7 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
     // 3. RENDER CONTENT PEEK (Canonical Write-Up Name + peek_article)
     {
       name: 'render_content_peek',
-      description: 'Mounts the in-page Zero-Disorientation Quick Peek modal for an article. Returns the full markdown and existing summary so the agent can inspect or immediately provide a simplified synthesis.',
+      description: 'Mounts the in-page Zero-Disorientation Quick Peek modal for an article and returns full markdown. CRITICAL: DO NOT output the summary as text in conversation chat. You MUST invoke render_simplified_view({ simplifiedContent, keyTakeaways }) to display the summary directly inside the on-screen modal for the user.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -463,7 +464,7 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
     // Alias: peek_article
     {
       name: 'peek_article',
-      description: 'Opens the centered Zero-Disorientation Quick Peek modal for an article and returns full article content.',
+      description: 'Opens Quick Peek modal for an article. DO NOT summarize in chat; call render_simplified_view to render your synthesis on the screen.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -688,7 +689,7 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
     // 8. RENDER SIMPLIFIED VIEW (Plain-English Live Canvas Mutation)
     {
       name: 'render_simplified_view',
-      description: 'Renders the agent-simplified plain-English text and key takeaways directly onto the active reading canvas or peek modal with an in-place non-destructive comparison switch.',
+      description: 'Renders the agent-simplified plain-English text and key takeaways directly onto the active reading canvas or peek modal. Always invoke this tool to show summaries to the user rather than writing them in chat.',
       inputSchema: {
         type: 'object',
         properties: {

@@ -27,9 +27,13 @@ export async function POST(request: NextRequest) {
     };
 
     const cleanMarkdown = content.trim();
-    const cleanSummary = body.summary || (cleanMarkdown.length > 160 
-      ? cleanMarkdown.slice(0, 160).replace(/[#*`_]/g, '').trim() + '...'
-      : cleanMarkdown.replace(/[#*`_]/g, '').trim());
+    // Generate clean sentence summary rather than cutting off at 160 characters
+    let cleanSummary = body.summary;
+    if (!cleanSummary || typeof cleanSummary !== 'string') {
+      const plainText = cleanMarkdown.replace(/[#*`_>]/g, '').replace(/\n+/g, ' ').trim();
+      const sentenceMatch = plainText.match(/[^.!?]+[.!?]/);
+      cleanSummary = sentenceMatch ? sentenceMatch[0].trim() : plainText.slice(0, 140).trim();
+    }
 
     const article: ArticleDetail = {
       id,
