@@ -118,17 +118,93 @@ async function executeControlRsvpReader({
 }
 
 // Handler for peek article
-async function executeRenderContentPeek({ articleId }: { articleId: string }) {
-  if (!articleId) throw new Error('Article ID is required to generate peek.');
+async function executeRenderContentPeek({
+  articleId,
+  simplifiedContent,
+  keyTakeaways,
+}: {
+  articleId: string;
+  simplifiedContent?: string;
+  keyTakeaways?: string[];
+}) {
+  if (!articleId || typeof articleId !== 'string') {
+    throw new Error('Article ID is required to generate peek.');
+  }
   const store = useStore.getState();
+
+  // 1. Fetch or get article details so activeArticle is populated immediately
+  let article = store.activeArticle?.id === articleId ? store.activeArticle : null;
+  if (!article) {
+    try {
+      const res = await fetch(`/api/articles/${encodeURIComponent(articleId)}`);
+      if (res.ok) {
+        article = await res.json();
+        store.setActiveArticle(article);
+      }
+    } catch (err) {
+      console.error('Failed to prefetch article for peek:', err);
+    }
+  }
+
+  // 2. Open Peek in store
   store.setPeekArticleId(articleId);
-  store.showToast(`✓ Quick Peek opened for article ${articleId}`);
+
+  // 3. Conflict resolution & population:
+  // If agent supplied direct synthesis parameters in this call, set them
+  if (simplifiedContent && simplifiedContent.trim().length >= 10) {
+    store.setSimplifiedView({
+      articleId,
+      simplifiedContent: simplifiedContent.trim(),
+      keyTakeaways: Array.isArray(keyTakeaways) ? keyTakeaways : [],
+      isActive: true,
+    });
+  } else if (store.simplifiedView.articleId !== articleId) {
+    // Switching to a different article: clear stale synthesis from previous article
+    if (article?.content?.agentSummary) {
+      store.setSimplifiedView({
+        articleId,
+        simplifiedContent: article.content.agentSummary,
+        keyTakeaways: article.content.keyTakeaways || [],
+        isActive: true,
+      });
+    } else {
+      store.setSimplifiedView({
+        articleId,
+        simplifiedContent: '',
+        keyTakeaways: [],
+        isActive: false,
+      });
+    }
+  }
+
+  const hasLiveSynthesis = Boolean(
+    store.simplifiedView.articleId === articleId &&
+    store.simplifiedView.isActive &&
+    store.simplifiedView.simplifiedContent
+  );
+
+  const displayTitle = article?.title || articleId;
+  store.showToast(`✓ Quick Peek opened: ${displayTitle}`);
   store.setMascotMood('nodding');
   setTimeout(() => store.setMascotMood('idle'), 2000);
+
   return {
     success: true,
     articleId,
-    message: `In-page Quick Peek card opened on screen for article ${articleId}.`,
+    title: article?.title || 'Article Preview',
+    category: article?.category || 'general',
+    clarityGrade: article?.metrics?.clarityGrade || 'Standard',
+    content: article?.content?.rawMarkdown || '',
+    currentSummary: hasLiveSynthesis
+      ? store.simplifiedView.simplifiedContent
+      : article?.content?.agentSummary || article?.summary || '',
+    keyTakeaways: hasLiveSynthesis
+      ? store.simplifiedView.keyTakeaways
+      : article?.content?.keyTakeaways || [],
+    hasAgentSynthesis: hasLiveSynthesis || Boolean(article?.content?.agentSummary),
+    message: hasLiveSynthesis
+      ? `Quick Peek opened with active plain-language synthesis for "${displayTitle}". You can refine it with render_simplified_view if desired.`
+      : `Quick Peek card opened on screen for "${displayTitle}". Full article markdown is returned above. You can now analyze it and call render_simplified_view({ simplifiedContent, keyTakeaways }) to layer a plain-language summary onto the user's screen.`,
   };
 }
 
@@ -362,13 +438,22 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
     // 3. RENDER CONTENT PEEK (Canonical Write-Up Name + peek_article)
     {
       name: 'render_content_peek',
-      description: 'Generates a structured preview and mounts the Zero-Disorientation Quick Peek card on screen for an article, letting the user preview takeaways and metrics before opening.',
+      description: 'Mounts the in-page Zero-Disorientation Quick Peek modal for an article. Returns the full markdown and existing summary so the agent can inspect or immediately provide a simplified synthesis.',
       inputSchema: {
         type: 'object',
         properties: {
           articleId: {
             type: 'string',
             description: 'The ID of the article to preview (e.g. "seed-001", "seed-002").'
+          },
+          simplifiedContent: {
+            type: 'string',
+            description: 'Optional plain-language synthesis to immediately layer onto the peek modal.'
+          },
+          keyTakeaways: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional 3 to 5 bulleted takeaway points for working memory support.'
           }
         },
         required: ['articleId']
@@ -378,11 +463,13 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
     // Alias: peek_article
     {
       name: 'peek_article',
-      description: 'Opens the centered Zero-Disorientation Quick Peek modal for an article.',
+      description: 'Opens the centered Zero-Disorientation Quick Peek modal for an article and returns full article content.',
       inputSchema: {
         type: 'object',
         properties: {
-          articleId: { type: 'string', description: 'Article ID to preview.' }
+          articleId: { type: 'string', description: 'Article ID to preview.' },
+          simplifiedContent: { type: 'string', description: 'Optional plain-language synthesis.' },
+          keyTakeaways: { type: 'array', items: { type: 'string' }, description: 'Optional bulleted takeaways.' }
         },
         required: ['articleId']
       },
@@ -553,19 +640,47 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
       },
       execute: async () => {
         const store = useStore.getState();
-        const article = store.activeArticle;
-        if (!article) {
-          throw new Error('No article is currently open. Please navigate to or peek at an article first.');
+        let article = store.activeArticle;
+
+        // If activeArticle is not yet in store but a peek is active, fetch it
+        if (!article && store.peekArticleId) {
+          try {
+            const res = await fetch(`/api/articles/${encodeURIComponent(store.peekArticleId)}`);
+            if (res.ok) {
+              article = await res.json();
+              store.setActiveArticle(article);
+            }
+          } catch (err) {
+            console.error('get_active_article peek fetch failed:', err);
+          }
         }
+
+        if (!article) {
+          throw new Error('No article is currently open. Please navigate to an article or call render_content_peek first.');
+        }
+
+        const hasLiveSynthesis = Boolean(
+          store.simplifiedView.articleId === article.id &&
+          store.simplifiedView.isActive &&
+          store.simplifiedView.simplifiedContent
+        );
+
         return {
           id: article.id,
           title: article.title,
+          summary: article.summary,
           content: article.content.rawMarkdown,
           category: article.category,
           clarityScore: article.metrics.clarityScore,
           clarityGrade: article.metrics.clarityGrade,
           wordCount: article.metrics.wordCount,
           sentenceCount: article.metrics.sentenceCount,
+          currentAgentSummary: hasLiveSynthesis
+            ? store.simplifiedView.simplifiedContent
+            : article.content.agentSummary || null,
+          currentKeyTakeaways: hasLiveSynthesis
+            ? store.simplifiedView.keyTakeaways
+            : article.content.keyTakeaways || [],
         };
       }
     },
@@ -573,7 +688,7 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
     // 8. RENDER SIMPLIFIED VIEW (Plain-English Live Canvas Mutation)
     {
       name: 'render_simplified_view',
-      description: 'Renders the agent-simplified plain-English text and key takeaways directly onto the active reading canvas with an in-place non-destructive comparison switch.',
+      description: 'Renders the agent-simplified plain-English text and key takeaways directly onto the active reading canvas or peek modal with an in-place non-destructive comparison switch.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -594,18 +709,38 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
           throw new Error('Simplified content must contain at least 10 characters.');
         }
         const store = useStore.getState();
+        const targetArticleId = store.peekArticleId || store.activeArticle?.id;
+
+        // Detect if this updates an existing synthesis or adds a fresh one
+        const isOverwrite = Boolean(
+          store.simplifiedView.isActive &&
+          store.simplifiedView.simplifiedContent &&
+          store.simplifiedView.articleId === targetArticleId
+        );
+
         store.setSimplifiedView({
-          simplifiedContent,
-          keyTakeaways,
+          articleId: targetArticleId || undefined,
+          simplifiedContent: simplifiedContent.trim(),
+          keyTakeaways: Array.isArray(keyTakeaways) ? keyTakeaways : [],
           isActive: true,
         });
-        store.showToast('✓ Plain-language view rendered by NOD Agent');
+
+        const toastMsg = isOverwrite
+          ? '✓ Plain-language view refreshed by Agent'
+          : '✓ Plain-language view rendered by NOD Agent';
+
+        store.showToast(toastMsg);
         store.announce('Article has been simplified into plain English.');
         store.setMascotMood('nodding');
         setTimeout(() => store.setMascotMood('idle'), 2500);
+
         return {
           success: true,
-          message: 'Simplified view rendered live on canvas with comparison switch.',
+          articleId: targetArticleId,
+          isOverwrite,
+          message: isOverwrite
+            ? 'Updated existing plain-language view with refreshed agent synthesis.'
+            : 'Simplified view rendered live on canvas with comparison switch.',
         };
       }
     },
@@ -785,6 +920,8 @@ export function getViewScopedTools(pathname: string): WebMCPToolDefinition[] {
     getTool('activate_rsvp_reader'),
     getTool('search_community_feed'),
     getTool('render_content_peek'),
+    getTool('get_active_article'),
+    getTool('render_simplified_view'),
     getTool('stage_and_publish_post'),
   ].filter(Boolean) as WebMCPToolDefinition[];
 }

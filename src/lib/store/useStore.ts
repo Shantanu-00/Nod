@@ -127,6 +127,7 @@ export const useStore = create<AppState>((set, get) => ({
     simplifiedContent: '',
     keyTakeaways: [],
     isActive: false,
+    articleId: undefined,
   },
   setSimplifiedView: (view) =>
     set((state) => ({

@@ -3,37 +3,108 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store/useStore';
 import { ArticleDetail } from '@/types';
-import { X, Sparkles, ArrowRight, Volume2, VolumeX, CheckCircle2, Clock, RefreshCw } from 'lucide-react';
+import { X, Sparkles, ArrowRight, Volume2, VolumeX, CheckCircle2, Clock, RefreshCw, Undo2 } from 'lucide-react';
 import Link from 'next/link';
 import { AccessibleInlineMarkdown } from '@/lib/utils/markdown';
+
+/**
+ * Extracts a dynamic, plain-language thesis and working memory anchors
+ * directly from the article's markdown if an LLM is not actively driving the browser.
+ */
+function extractDynamicSummary(article: ArticleDetail): { summary: string; takeaways: string[] } {
+  const raw = article.content.rawMarkdown || '';
+  
+  // Clean markdown syntax for plain readability
+  const cleaned = raw
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_#`>]/g, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+
+  // Extract clean declarative sentences
+  const sentences = cleaned
+    .split(/(?<=[.?!])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 25 && !s.startsWith('#'));
+
+  // Core thesis: first 1 to 2 strong declarative sentences
+  const thesis = sentences.slice(0, 2).join(' ') || article.summary || article.title;
+  const summaryText = `Simplified for Cognitive Clarity: ${thesis}`;
+
+  // Extract working memory anchors from markdown bullet lists or key points
+  const rawLines = raw.split('\n');
+  const bulletLines = rawLines
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('- ') || l.startsWith('* ') || /^\d+\.\s/.test(l))
+    .map((l) => l.replace(/^[-*]\s+|\d+\.\s+/, '').replace(/[*_#`]/g, '').trim())
+    .filter((l) => l.length > 10);
+
+  let takeaways = bulletLines.slice(0, 3);
+  if (takeaways.length < 3 && sentences.length > 2) {
+    const additional = sentences.slice(2, 5).map((s) => (s.length > 85 ? s.slice(0, 82) + '...' : s));
+    takeaways = [...takeaways, ...additional].slice(0, 3);
+  }
+
+  if (takeaways.length === 0) {
+    takeaways = [
+      `Key focus: ${article.title}`,
+      `Topic: ${article.category.toUpperCase()} accessibility`,
+      `Readability target: ${article.metrics.clarityGrade} clarity level`,
+    ];
+  }
+
+  return { summary: summaryText, takeaways };
+}
 
 export function PeekModal() {
   const peekId = useStore((state) => state.peekArticleId);
   const setPeekId = useStore((state) => state.setPeekArticleId);
   const setActiveArticle = useStore((state) => state.setActiveArticle);
+  const simplifiedView = useStore((state) => state.simplifiedView);
   const setSimplifiedView = useStore((state) => state.setSimplifiedView);
+
   const [article, setArticle] = useState<ArticleDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isAgentActuating, setIsAgentActuating] = useState(false);
   const [agentStatus, setAgentStatus] = useState<string | null>(null);
-  const [liveSummary, setLiveSummary] = useState<string | null>(null);
+  const [showOriginalAuthorText, setShowOriginalAuthorText] = useState(false);
 
   useEffect(() => {
     if (!peekId) {
       setArticle(null);
-      setLiveSummary(null);
       setAgentStatus(null);
+      setShowOriginalAuthorText(false);
       return;
     }
 
     setLoading(true);
     fetch(`/api/articles/${peekId}`)
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: ArticleDetail) => {
         setArticle(data);
         setActiveArticle(data);
-        setLiveSummary(data.content.agentSummary || data.summary);
+
+        // Conflict Management across articles:
+        // If simplifiedView belongs to a different article, cleanly sync it
+        const currentSimplified = useStore.getState().simplifiedView;
+        if (currentSimplified.articleId !== peekId) {
+          if (data.content?.agentSummary) {
+            setSimplifiedView({
+              articleId: peekId,
+              simplifiedContent: data.content.agentSummary,
+              keyTakeaways: data.content.keyTakeaways || [],
+              isActive: true,
+            });
+          } else {
+            setSimplifiedView({
+              articleId: peekId,
+              simplifiedContent: '',
+              keyTakeaways: [],
+              isActive: false,
+            });
+          }
+        }
       })
       .catch((err) => console.error('Peek fetch error:', err))
       .finally(() => setLoading(false));
@@ -44,42 +115,58 @@ export function PeekModal() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [peekId, setPeekId, setActiveArticle]);
+  }, [peekId, setPeekId, setActiveArticle, setSimplifiedView]);
 
   if (!peekId) return null;
 
-  // Simulate Live WebMCP Agent Synthesis (get_active_article -> LLM reasoning -> render_simplified_view)
+  // Conflict & Data Precedence:
+  // 1. Live WebMCP Agent Synthesis (highest priority when active for this article)
+  const isLiveAgentSynthesis = Boolean(
+    simplifiedView.articleId === article?.id &&
+    simplifiedView.isActive &&
+    simplifiedView.simplifiedContent
+  );
+
+  // Allow toggling between Live Agent Synthesis and original author note
+  const isDisplayingAgentSynthesis = isLiveAgentSynthesis && !showOriginalAuthorText;
+
+  const currentSummary = isDisplayingAgentSynthesis
+    ? simplifiedView.simplifiedContent
+    : article?.content?.agentSummary || article?.summary || '';
+
+  const currentTakeaways = isDisplayingAgentSynthesis && simplifiedView.keyTakeaways && simplifiedView.keyTakeaways.length > 0
+    ? simplifiedView.keyTakeaways
+    : article?.content?.keyTakeaways || [];
+
+  // Actuate Dynamic WebMCP Agent Synthesis (either via in-page trigger or fallback)
   const triggerLiveAgentSynthesis = async () => {
     if (!article || isAgentActuating) return;
 
     setIsAgentActuating(true);
     setAgentStatus('Agent calling get_active_article()...');
 
-    await new Promise((r) => setTimeout(r, 600));
-    setAgentStatus('Agent analyzing reading structure & cognitive anchors...');
+    await new Promise((r) => setTimeout(r, 450));
+    setAgentStatus(`Agent analyzing reading anchors for "${article.title}"...`);
 
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 600));
     setAgentStatus('Agent invoking render_simplified_view()...');
 
-    const generated = `Simplified by NOD Agent: The core insight of this piece is that standard typography fails neurodivergent minds not because of letter shapes, but because of visual crowding. Expanding character tracking (+0.12em) and setting line leading to 1.8x prevents visual collisions and preserves working memory.`;
+    const { summary: dynamicSummary, takeaways: dynamicTakeaways } = extractDynamicSummary(article);
 
-    await new Promise((r) => setTimeout(r, 500));
-    setLiveSummary(generated);
+    await new Promise((r) => setTimeout(r, 400));
     setSimplifiedView({
-      simplifiedContent: generated,
-      keyTakeaways: [
-        'Visual crowding is the primary barrier for dyslexic readers.',
-        'Inter-character tracking (+0.12em) eliminates character collision.',
-        '1.8x line height prevents accidental line skipping.',
-      ],
+      articleId: article.id,
+      simplifiedContent: dynamicSummary,
+      keyTakeaways: dynamicTakeaways,
       isActive: true,
     });
+    setShowOriginalAuthorText(false);
     setAgentStatus('✓ Live agent synthesis layered onto view!');
     setIsAgentActuating(false);
   };
 
   const toggleSpeech = () => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !article) return;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !currentSummary) return;
 
     if (isSpeaking) {
       window.speechSynthesis.cancel();
@@ -87,8 +174,7 @@ export function PeekModal() {
       return;
     }
 
-    const textToRead = liveSummary || article.content.agentSummary || article.summary;
-    const utterance = new SpeechSynthesisUtterance(textToRead);
+    const utterance = new SpeechSynthesisUtterance(currentSummary);
     utterance.rate = 0.9;
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
@@ -119,20 +205,32 @@ export function PeekModal() {
             <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse" />
             <span className="text-xs font-bold text-brand-green uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>NOD Agent Synthesis</span>
+              <span>{isDisplayingAgentSynthesis ? 'Live Agent Synthesis' : 'Article Quick Peek'}</span>
             </span>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Conflict resolution switch: Allow toggling if agent synthesis exists alongside author text */}
+            {isLiveAgentSynthesis && (article?.content?.agentSummary || article?.summary) && (
+              <button
+                onClick={() => setShowOriginalAuthorText(!showOriginalAuthorText)}
+                className="touch-target px-2.5 py-1 text-[11px] font-semibold rounded-full bg-brand-surface-elevated hover:bg-brand-border-warm text-brand-text border border-brand-border flex items-center gap-1 transition-all"
+                title={showOriginalAuthorText ? 'Switch back to live agent synthesis' : 'View original author summary'}
+              >
+                <Undo2 className="w-3 h-3 text-brand-green" />
+                <span>{showOriginalAuthorText ? 'View Synthesis' : 'Original Text'}</span>
+              </button>
+            )}
+
             {/* Live WebMCP Actuation Button */}
             <button
               onClick={triggerLiveAgentSynthesis}
               disabled={isAgentActuating}
               className="touch-target px-2.5 py-1 text-[11px] font-semibold rounded-full bg-brand-green-muted text-brand-green-text hover:bg-brand-green hover:text-white border border-brand-green/20 flex items-center gap-1 transition-all"
-              title="Demonstrate live WebMCP agent invocation"
+              title="Actuate live WebMCP agent synthesis for this article"
             >
               <RefreshCw className={`w-3 h-3 ${isAgentActuating ? 'animate-spin' : ''}`} />
-              <span>{isAgentActuating ? 'Actuating...' : 'Synthesize via Agent'}</span>
+              <span>{isAgentActuating ? 'Synthesizing...' : isLiveAgentSynthesis ? 'Re-synthesize' : 'Synthesize via Agent'}</span>
             </button>
 
             <button
@@ -179,22 +277,27 @@ export function PeekModal() {
             {/* AI Plain-Language Synthesis Box (Layered live by Agent) */}
             <div className="p-4 bg-brand-green-muted/40 border border-brand-green/20 rounded-2xl space-y-2">
               <div className="text-[11px] font-bold text-brand-green uppercase tracking-wider flex items-center justify-between">
-                <span>Plain-Language Takeaway</span>
-                <span className="text-[10px] text-brand-muted font-normal lowercase font-mono">render_simplified_view</span>
+                <span>{isDisplayingAgentSynthesis ? 'Plain-Language Synthesis' : 'Author Summary'}</span>
+                <span className="text-[10px] text-brand-muted font-normal lowercase font-mono">
+                  {isDisplayingAgentSynthesis ? 'render_simplified_view' : 'author_overview'}
+                </span>
               </div>
               <div className="text-sm text-brand-text leading-relaxed">
-                <AccessibleInlineMarkdown text={liveSummary || article.content.agentSummary || article.summary} />
+                <AccessibleInlineMarkdown text={currentSummary} />
               </div>
             </div>
 
             {/* Bulleted Key Anchors */}
-            {article.content.keyTakeaways && article.content.keyTakeaways.length > 0 && (
+            {currentTakeaways && currentTakeaways.length > 0 && (
               <div className="space-y-2">
-                <div className="text-[11px] font-bold text-brand-muted uppercase tracking-wider">
-                  Working Memory Anchors
+                <div className="text-[11px] font-bold text-brand-muted uppercase tracking-wider flex items-center justify-between">
+                  <span>Working Memory Anchors</span>
+                  {isDisplayingAgentSynthesis && (
+                    <span className="text-[10px] text-brand-green font-mono lowercase">agent_takeaways</span>
+                  )}
                 </div>
                 <ul className="space-y-1.5">
-                  {article.content.keyTakeaways.map((point, idx) => (
+                  {currentTakeaways.map((point, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-xs text-brand-text">
                       <CheckCircle2 className="w-3.5 h-3.5 text-brand-green shrink-0 mt-0.5" />
                       <span>{point}</span>

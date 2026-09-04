@@ -80,6 +80,7 @@ export interface SimplifiedView {
   simplifiedContent: string;
   keyTakeaways: string[];
   isActive: boolean;
+  articleId?: string;
 }
 
 export type MascotMood = 'idle' | 'listening' | 'nodding' | 'completed';
