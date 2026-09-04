@@ -267,6 +267,7 @@ async function executeInsertInteractiveQuote({ quote, attribution }: { quote: st
 }
 
 // Handler for two-step staging and publishing
+// Handler for two-step staging and publishing
 async function executeStageAndPublishPost({
   title,
   content,
@@ -285,14 +286,18 @@ async function executeStageAndPublishPost({
   const targetContent = content?.trim() || store.editorDraft.content.trim();
 
   if (!targetTitle || targetTitle.length < 3) {
-    throw new Error('Post title is required and must contain at least 3 characters.');
+    throw new Error('Post title is required and must contain at least 3 characters. Provide the "title" parameter in the tool call.');
   }
   if (!targetContent || targetContent.length < 10) {
-    throw new Error('Post content is required and must contain at least 10 characters.');
+    throw new Error('Post content is required and must contain at least 10 characters. Provide the "content" parameter in the tool call.');
   }
 
-  // If immediate flag is explicitly set, write directly to Netlify Blobs
+  // If immediate flag is explicitly set, write directly to Netlify Blobs / backend
   if (immediate) {
+    const formattedHandle = store.editorDraft.handle?.startsWith('@')
+      ? store.editorDraft.handle
+      : `@${store.editorDraft.handle || 'community'}`;
+
     const res = await fetch('/api/articles', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -300,21 +305,49 @@ async function executeStageAndPublishPost({
         title: targetTitle,
         content: targetContent,
         category,
-        tags,
-        author: { id: 'agent-user', name: store.editorDraft.authorName || 'Community Member' },
+        tags: Array.isArray(tags) ? tags : [],
+        author: {
+          id: 'author-user',
+          name: store.editorDraft.authorName || 'Community Contributor',
+          handle: formattedHandle,
+          badge: 'Author',
+        },
       }),
     });
-    if (!res.ok) throw new Error(`Publish failed: HTTP ${res.status}`);
+
+    if (!res.ok) {
+      throw new Error(`Publish failed with status HTTP ${res.status}`);
+    }
+
     const result = await res.json();
-    store.announce(`Story "${targetTitle}" published successfully.`);
+    store.announce(`Story "${targetTitle}" published successfully to community feed.`);
+    store.showToast(`✓ Published: "${targetTitle}"`);
+    store.setMascotMood('completed');
+    setTimeout(() => store.setMascotMood('idle'), 3000);
+
+    // Clear active editor draft
+    store.setEditorDraft({
+      title: '',
+      content: '',
+      category: 'strategies',
+      tags: [],
+      proposedText: null,
+      proposedTitle: null,
+    });
+
     if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('nod_draft_title');
+      sessionStorage.removeItem('nod_draft_content');
       window.dispatchEvent(new CustomEvent('nod:feed-updated'));
     }
+
     return {
       success: true,
       published: true,
       id: result.id,
-      message: `Story "${targetTitle}" published directly to community feed.`,
+      articleUrl: `/articles/${result.id}`,
+      title: targetTitle,
+      message: `Story "${targetTitle}" was published directly to the community feed. Inform the user that it is live at /articles/${result.id}.`,
     };
   }
 
@@ -323,7 +356,9 @@ async function executeStageAndPublishPost({
     title: targetTitle,
     content: targetContent,
     category,
-    tags,
+    tags: Array.isArray(tags) ? tags : [],
+    authorName: store.editorDraft.authorName || 'Community Contributor',
+    handle: store.editorDraft.handle || '@community',
   });
 
   return {
@@ -333,7 +368,8 @@ async function executeStageAndPublishPost({
     category: staged.category,
     wordCount: staged.metrics.wordCount,
     clarityGrade: staged.metrics.clarityGrade,
-    message: 'Post staged for review. The on-screen Publishing Approval Card is now awaiting the human user\'s confirmation.',
+    actionRequired: 'HUMAN_CONFIRMATION_REQUIRED: The post is staged in the on-screen Publishing Approval Card, but NOT yet saved to the database. Inform the user that they must click "Confirm & Publish [Enter]" on their browser screen to publish it.',
+    message: `Post "${staged.title}" is staged for review. The on-screen Publishing Approval Card is now visible to the user. The human user must click "Confirm & Publish [Enter]" (or press Enter/Space) on their screen to persist it to the feed.`,
   };
 }
 
@@ -580,10 +616,10 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
       execute: executeInsertInteractiveQuote,
     },
 
-    // 6. STAGE AND PUBLISH POST (Canonical Write-Up Name: Two-Step Publishing Approval Flow)
+    // 6. STAGE AND PUBLISH POST (Two-Step Publishing Human-in-the-Loop)
     {
       name: 'stage_and_publish_post',
-      description: 'Stages a post and mounts the on-screen Approval Card for explicit human confirmation before persisting to the community feed. Keeps human in full editorial control.',
+      description: 'Prepares and publishes an article. By default, mounts the on-screen Publishing Approval Card for human confirmation. Pass immediate: true to publish directly to the community feed without waiting for manual confirmation.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -604,6 +640,10 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
             type: 'array',
             items: { type: 'string' },
             description: 'Topic tags (e.g. ["adhd", "focus", "reading"]).'
+          },
+          immediate: {
+            type: 'boolean',
+            description: 'Set to true to publish directly to the public feed immediately. Defaults to false, which mounts the on-screen Publishing Approval Card for human verification.'
           }
         },
         required: ['title', 'content']
@@ -613,7 +653,7 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
     // Alias: publish_article
     {
       name: 'publish_article',
-      description: 'Prepares and publishes an article to the community feed (stages for review by default). Uses structured accessible markdown.',
+      description: 'Publishes an article to the community feed. Mounts on-screen Approval Card by default, or publishes directly when immediate: true.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -623,7 +663,8 @@ export function createCanonicalWebMCPTools(): WebMCPToolDefinition[] {
             description: "Body markdown. MUST format with '## ' headers, '**bold**' anchor concepts, and '-' bullet lists for accessibility." 
           },
           category: { type: 'string', enum: ['strategies', 'stories', 'technology', 'discussion'] },
-          tags: { type: 'array', items: { type: 'string' } }
+          tags: { type: 'array', items: { type: 'string' } },
+          immediate: { type: 'boolean', description: 'Set true to publish directly to feed without mounting approval modal.' }
         },
         required: ['title', 'content']
       },
