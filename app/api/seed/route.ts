@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ensureBlobsSeeded } from '@/lib/blobs/client';
+import { ensureBlobsSeeded, cleanupDuplicateFeedBlobs } from '@/lib/blobs/client';
 import { SEED_ARTICLES } from '@/lib/blobs/seeds';
 import { getStore } from '@netlify/blobs';
 
@@ -9,12 +9,39 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const force = searchParams.get('force') === 'true';
+    const clean = searchParams.get('clean') === 'true';
 
-    // If force is requested and in Netlify environment, re-seed even if keys exist
+    // Explicit cleanup action: removes duplicate keys from feedStore
+    if (clean) {
+      const result = await cleanupDuplicateFeedBlobs();
+      return NextResponse.json({
+        success: true,
+        message: `Deduplication complete. Deleted ${result.deletedKeys.length} duplicate feed keys.`,
+        deletedKeys: result.deletedKeys,
+        remainingUniqueArticles: result.keptCount,
+      });
+    }
+
+    // If force is requested and in Netlify environment, clean previous seed entries first
     if (force && (process.env.NETLIFY || process.env.NETLIFY_BLOBS_CONTEXT)) {
       const feedStore = getStore('feed');
       const articlesStore = getStore('articles');
       const commentsStore = getStore('comments');
+
+      // 1. Remove any existing keys for seed articles in feedStore to guarantee idempotency
+      try {
+        const { blobs } = await feedStore.list();
+        const seedIds = new Set(SEED_ARTICLES.map((a) => a.id));
+        for (const b of blobs) {
+          const underscoreIdx = b.key.indexOf('_');
+          const articleId = underscoreIdx !== -1 ? b.key.slice(underscoreIdx + 1) : b.key;
+          if (seedIds.has(articleId)) {
+            await feedStore.delete(b.key).catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.warn('Could not clear prior seed keys:', err);
+      }
 
       for (const article of SEED_ARTICLES) {
         const timestamp = new Date(article.createdAt).getTime();
@@ -52,17 +79,19 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Forced re-seeding completed with ${SEED_ARTICLES.length} articles!`,
+        message: `Forced re-seeding completed with ${SEED_ARTICLES.length} unique articles!`,
         count: SEED_ARTICLES.length,
       });
     }
 
     await ensureBlobsSeeded();
+    const cleanupResult = await cleanupDuplicateFeedBlobs();
 
     return NextResponse.json({
       success: true,
       message: `Verified Netlify Blobs seeding with ${SEED_ARTICLES.length} articles.`,
       count: SEED_ARTICLES.length,
+      deletedDuplicates: cleanupResult.deletedKeys.length,
     });
   } catch (err: any) {
     return NextResponse.json(

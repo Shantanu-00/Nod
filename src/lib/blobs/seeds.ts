@@ -65,8 +65,8 @@ By expanding character tracking by **+0.12em** and word spacing by **+0.20em**, 
         'Calibrated warm cream backgrounds eliminate photopic glare.',
       ],
     },
-    createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+    createdAt: '2026-09-03T18:26:47.821Z',
+    updatedAt: '2026-09-03T18:26:47.821Z',
   },
 
   // 2. Motor Fatigue
@@ -107,8 +107,8 @@ Editing with a mouse requires fine motor drag. A binary review system—tapping 
         'Binary keyboard review eliminates painful mouse dragging.',
       ],
     },
-    createdAt: new Date(Date.now() - 3600000 * 10).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 10).toISOString(),
+    createdAt: '2026-09-03T11:26:47.821Z',
+    updatedAt: '2026-09-03T11:26:47.821Z',
   },
 
   // 3. Spatial Anchor Amnesia
@@ -145,8 +145,8 @@ By previewing synthesis in a centered modal while keeping the parent feed visibl
         'Instant dismissal restores the exact previous scroll position.',
       ],
     },
-    createdAt: new Date(Date.now() - 3600000 * 20).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 20).toISOString(),
+    createdAt: '2026-09-03T01:26:47.821Z',
+    updatedAt: '2026-09-03T01:26:47.821Z',
   },
 
   // 4. Bionic Reading
@@ -191,8 +191,8 @@ The **bra**in **recog**nizes **fam**iliar **pat**terns **inst**antly.
         'Preserves working memory by cutting regression re-reads by nearly a third.',
       ],
     },
-    createdAt: new Date(Date.now() - 3600000 * 28).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 28).toISOString(),
+    createdAt: '2026-09-02T17:26:47.821Z',
+    updatedAt: '2026-09-02T17:26:47.821Z',
   },
 
   // 5. Visual Stress & Tinted Backgrounds
@@ -234,8 +234,8 @@ Replacing #FFFFFF with calibrated warm tones normalizes retinal hyper-reactivity
         'Proper chromatic tinting enables hours of sustained reading without eye strain.',
       ],
     },
-    createdAt: new Date(Date.now() - 3600000 * 36).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 36).toISOString(),
+    createdAt: '2026-09-02T09:26:47.821Z',
+    updatedAt: '2026-09-02T09:26:47.821Z',
   },
 
   // 6. WebMCP Browser Native Standards
@@ -275,8 +275,8 @@ With WebMCP, AI ceases to be a distant chatbot on another tab—it becomes an in
         'Human-in-the-loop security hints ensure users remain in full control of mutations.',
       ],
     },
-    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 48).toISOString(),
+    createdAt: '2026-09-01T21:26:47.821Z',
+    updatedAt: '2026-09-01T21:26:47.821Z',
   },
 
   // 7. Binary Review Gatekeeper
@@ -322,8 +322,8 @@ Assistive technology should empower human expression, never erase it.`,
         'Keyboard shortcuts (Space to Accept, Backspace to Keep) eliminate motor strain.',
       ],
     },
-    createdAt: new Date(Date.now() - 3600000 * 60).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 60).toISOString(),
+    createdAt: '2026-09-01T09:26:47.821Z',
+    updatedAt: '2026-09-01T09:26:47.821Z',
   },
 
   // 8. Plain Language Laws
@@ -365,8 +365,8 @@ By the time a dyslexic or ADHD reader reaches "deferred implementation", the ini
         'Plain-English structuring delivers equal intellectual depth with zero cognitive exhaustion.',
       ],
     },
-    createdAt: new Date(Date.now() - 3600000 * 72).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 72).toISOString(),
+    createdAt: '2026-08-31T21:26:47.821Z',
+    updatedAt: '2026-08-31T21:26:47.821Z',
   },
 
   // 9. Workplace Accommodations
@@ -408,8 +408,8 @@ Learning that I did not need to hide my dyslexia transformed my work. When I dem
         'Accessibility features like text synthesis benefit the entire organization.',
       ],
     },
-    createdAt: new Date(Date.now() - 3600000 * 86).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 86).toISOString(),
+    createdAt: '2026-08-31T07:26:47.821Z',
+    updatedAt: '2026-08-31T07:26:47.821Z',
   },
 
   // 10. The Reading Ruler
@@ -453,8 +453,8 @@ This simple visual anchor restores reading flow and prevents unintentional line 
         'GPU-accelerated overlays provide physical-classroom accessibility directly on the web.',
       ],
     },
-    createdAt: new Date(Date.now() - 3600000 * 98).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 98).toISOString(),
+    createdAt: '2026-08-30T19:26:47.821Z',
+    updatedAt: '2026-08-30T19:26:47.821Z',
   },
 ];
 

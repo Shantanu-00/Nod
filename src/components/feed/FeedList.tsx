@@ -49,8 +49,12 @@ export function FeedList() {
     });
   };
 
-  // Filter and sort items
-  const processedItems = items
+  // Defensive deduplication by id before filtering and sorting
+  const uniqueItems = items.filter((item, index, self) => 
+    self.findIndex((other) => other.id === item.id) === index
+  );
+
+  const processedItems = uniqueItems
     .filter((item) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();

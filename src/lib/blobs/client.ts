@@ -44,6 +44,66 @@ function hasNetlifyBlobs(): boolean {
 
 // Automatically populates Netlify Blobs on first access if the store is empty
 let isSeedingInProgress = false;
+
+// Cleanup duplicate feed keys in Netlify Blobs (e.g., if seed was run multiple times)
+export async function cleanupDuplicateFeedBlobs(): Promise<{ deletedKeys: string[]; keptCount: number }> {
+  if (!hasNetlifyBlobs()) {
+    const seenIds = new Set<string>();
+    const deletedKeys: string[] = [];
+    for (const [key, item] of Array.from(memoryFeedStore.entries())) {
+      if (seenIds.has(item.id)) {
+        memoryFeedStore.delete(key);
+        deletedKeys.push(key);
+      } else {
+        seenIds.add(item.id);
+      }
+    }
+    return { deletedKeys, keptCount: memoryFeedStore.size };
+  }
+
+  try {
+    const feedStore = getStore('feed');
+    const { blobs } = await feedStore.list();
+    if (!blobs || blobs.length === 0) {
+      return { deletedKeys: [], keptCount: 0 };
+    }
+
+    // Group keys by articleId (format: ${invertedTime}_${articleId})
+    const keysByArticleId = new Map<string, string[]>();
+    for (const blob of blobs) {
+      const underscoreIdx = blob.key.indexOf('_');
+      const articleId = underscoreIdx !== -1 ? blob.key.slice(underscoreIdx + 1) : blob.key;
+      const existing = keysByArticleId.get(articleId) || [];
+      existing.push(blob.key);
+      keysByArticleId.set(articleId, existing);
+    }
+
+    const deletedKeys: string[] = [];
+
+    for (const [articleId, keys] of keysByArticleId.entries()) {
+      if (keys.length > 1) {
+        // Sort keys lexicographically: smaller invertedTime = newer/canonical
+        keys.sort((a, b) => a.localeCompare(b));
+        // Keep the canonical key, delete all other duplicate keys
+        const [keepKey, ...duplicates] = keys;
+        for (const dupKey of duplicates) {
+          try {
+            await feedStore.delete(dupKey);
+            deletedKeys.push(dupKey);
+          } catch (delErr) {
+            console.error(`Failed to delete duplicate feed key ${dupKey}:`, delErr);
+          }
+        }
+      }
+    }
+
+    return { deletedKeys, keptCount: keysByArticleId.size };
+  } catch (err) {
+    console.error('Failed to cleanup duplicate feed blobs:', err);
+    return { deletedKeys: [], keptCount: 0 };
+  }
+}
+
 export async function ensureBlobsSeeded(): Promise<void> {
   if (!hasNetlifyBlobs() || isSeedingInProgress) return;
 
@@ -51,6 +111,8 @@ export async function ensureBlobsSeeded(): Promise<void> {
     const feedStore = getStore('feed');
     const { blobs } = await feedStore.list();
     if (blobs && blobs.length > 0) {
+      // Run background cleanup in case duplicates exist from prior seed runs
+      cleanupDuplicateFeedBlobs().catch(console.error);
       return; // Already populated!
     }
 
@@ -104,29 +166,71 @@ export async function getFeedItems(limit = 20, category = 'all'): Promise<FeedIt
       await ensureBlobsSeeded();
       const feedStore = getStore('feed');
       const { blobs } = await feedStore.list();
-      const topKeys = blobs.slice(0, limit).map((b) => b.key);
+
+      // Deduplicate keys by articleId before fetching so duplicates don't displace items
+      const seenArticleIds = new Set<string>();
+      const uniqueKeys: string[] = [];
+      const duplicateKeys: string[] = [];
+
+      for (const blob of blobs) {
+        const underscoreIdx = blob.key.indexOf('_');
+        const articleId = underscoreIdx !== -1 ? blob.key.slice(underscoreIdx + 1) : blob.key;
+        if (!seenArticleIds.has(articleId)) {
+          seenArticleIds.add(articleId);
+          uniqueKeys.push(blob.key);
+        } else {
+          duplicateKeys.push(blob.key);
+        }
+      }
+
+      // Proactively purge any duplicate keys in the background
+      if (duplicateKeys.length > 0) {
+        Promise.all(duplicateKeys.map((k) => feedStore.delete(k).catch(() => {}))).catch(() => {});
+      }
+
+      const keysToFetch = category === 'all' 
+        ? uniqueKeys.slice(0, limit) 
+        : uniqueKeys.slice(0, Math.max(limit * 3, 50));
+
       const items = await Promise.all(
-        topKeys.map(async (key) => (await feedStore.get(key, { type: 'json' })) as FeedItem | null)
+        keysToFetch.map(async (key) => (await feedStore.get(key, { type: 'json' })) as FeedItem | null)
       );
       const validItems = items.filter(Boolean) as FeedItem[];
-      if (validItems.length > 0) {
-        return category === 'all' 
-          ? validItems 
-          : validItems.filter((item) => item.category === category);
+
+      // Ensure strict uniqueness by item.id
+      const dedupMap = new Map<string, FeedItem>();
+      for (const item of validItems) {
+        if (!dedupMap.has(item.id)) {
+          dedupMap.set(item.id, item);
+        }
+      }
+      const uniqueItems = Array.from(dedupMap.values());
+
+      const filtered = category === 'all'
+        ? uniqueItems.slice(0, limit)
+        : uniqueItems.filter((item) => item.category === category).slice(0, limit);
+
+      if (filtered.length > 0) {
+        return filtered;
       }
     } catch {
       // fallback to memory
     }
   }
 
-  const items = Array.from(memoryFeedStore.entries())
-    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-    .slice(0, limit)
-    .map(([, item]) => item);
+  // Deduplicate in-memory store
+  const seenIds = new Set<string>();
+  const items: FeedItem[] = [];
+  for (const [, item] of Array.from(memoryFeedStore.entries()).sort(([keyA], [keyB]) => keyA.localeCompare(keyB))) {
+    if (!seenIds.has(item.id)) {
+      seenIds.add(item.id);
+      items.push(item);
+    }
+  }
 
   return category === 'all'
-    ? items
-    : items.filter((item) => item.category === category);
+    ? items.slice(0, limit)
+    : items.filter((item) => item.category === category).slice(0, limit);
 }
 
 export async function getArticleById(id: string): Promise<ArticleDetail | null> {
@@ -167,6 +271,19 @@ export async function saveArticle(article: ArticleDetail): Promise<{ feedKey: st
     try {
       const feedStore = getStore('feed');
       const articlesStore = getStore('articles');
+
+      // Clean up any older feed keys for this article so updates don't create duplicate entries
+      try {
+        const { blobs } = await feedStore.list();
+        for (const b of blobs) {
+          if (b.key.endsWith(`_${article.id}`) && b.key !== feedKey) {
+            await feedStore.delete(b.key).catch(() => {});
+          }
+        }
+      } catch {
+        // non-blocking
+      }
+
       await Promise.all([
         feedStore.setJSON(feedKey, feedItem),
         articlesStore.setJSON(article.id, article),
@@ -174,6 +291,13 @@ export async function saveArticle(article: ArticleDetail): Promise<{ feedKey: st
       return { feedKey };
     } catch {
       // fallback
+    }
+  }
+
+  // In-memory fallback: delete any older entry for this article
+  for (const [k, v] of Array.from(memoryFeedStore.entries())) {
+    if (v.id === article.id && k !== feedKey) {
+      memoryFeedStore.delete(k);
     }
   }
 
