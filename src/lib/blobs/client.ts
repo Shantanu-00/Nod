@@ -1,6 +1,7 @@
 import { getStore } from '@netlify/blobs';
 import { FeedItem, ArticleDetail, CommentItem } from '@/types';
 import { SEED_ARTICLES } from './seeds';
+import { extractArticleSummary } from '@/lib/utils/a11y-metrics';
 
 // In-memory fallback for local development
 const memoryFeedStore = new Map<string, FeedItem>();
@@ -210,6 +211,30 @@ export async function getFeedItems(limit = 20, category = 'all'): Promise<FeedIt
         ? uniqueItems.slice(0, limit)
         : uniqueItems.filter((item) => item.category === category).slice(0, limit);
 
+      // Self-healing check for prematurely truncated summaries (e.g. "Cristiano vs.")
+      for (const item of filtered) {
+        if (item && item.id && item.summary && item.summary.length < 35 && (/\b(?:vs|dr|mr|mrs|ms|e\.g|i\.e)\.$/i.test(item.summary) || item.summary.endsWith('.'))) {
+          try {
+            const articlesStore = getStore('articles');
+            const fullArticle = (await articlesStore.get(item.id, { type: 'json' })) as ArticleDetail | null;
+            if (fullArticle && fullArticle.content?.rawMarkdown) {
+              const healedSummary = extractArticleSummary(fullArticle.content.rawMarkdown, item.title);
+              if (healedSummary && healedSummary.length > item.summary.length) {
+                item.summary = healedSummary;
+                fullArticle.summary = healedSummary;
+                articlesStore.setJSON(item.id, fullArticle).catch(() => {});
+                const feedKey = uniqueKeys.find((k) => k.endsWith(`_${item.id}`));
+                if (feedKey) {
+                  feedStore.setJSON(feedKey, item).catch(() => {});
+                }
+              }
+            }
+          } catch {
+            // non-blocking
+          }
+        }
+      }
+
       if (filtered.length > 0) {
         return filtered;
       }
@@ -228,24 +253,52 @@ export async function getFeedItems(limit = 20, category = 'all'): Promise<FeedIt
     }
   }
 
-  return category === 'all'
+  const inMemoryFiltered = category === 'all'
     ? items.slice(0, limit)
     : items.filter((item) => item.category === category).slice(0, limit);
+
+  // Self-heal in-memory items if needed
+  for (const item of inMemoryFiltered) {
+    if (item && item.id && item.summary && item.summary.length < 35 && (/\b(?:vs|dr|mr|mrs|ms|e\.g|i\.e)\.$/i.test(item.summary) || item.summary.endsWith('.'))) {
+      const fullArticle = memoryArticlesStore.get(item.id);
+      if (fullArticle && fullArticle.content?.rawMarkdown) {
+        const healedSummary = extractArticleSummary(fullArticle.content.rawMarkdown, item.title);
+        if (healedSummary && healedSummary.length > item.summary.length) {
+          item.summary = healedSummary;
+          fullArticle.summary = healedSummary;
+        }
+      }
+    }
+  }
+
+  return inMemoryFiltered;
 }
 
 export async function getArticleById(id: string): Promise<ArticleDetail | null> {
+  let article: ArticleDetail | null = null;
   if (hasNetlifyBlobs()) {
     try {
       await ensureBlobsSeeded();
       const articlesStore = getStore('articles');
-      const article = await articlesStore.get(id, { type: 'json' });
-      if (article) return article as ArticleDetail;
+      article = ((await articlesStore.get(id, { type: 'json' })) as ArticleDetail) || null;
     } catch {
       // fallback to memory
     }
   }
 
-  return memoryArticlesStore.get(id) || null;
+  if (!article) {
+    article = memoryArticlesStore.get(id) || null;
+  }
+
+  // Self-heal article summary if prematurely truncated
+  if (article && article.summary && article.summary.length < 35 && article.content?.rawMarkdown) {
+    const healedSummary = extractArticleSummary(article.content.rawMarkdown, article.title);
+    if (healedSummary && healedSummary.length > article.summary.length) {
+      article.summary = healedSummary;
+    }
+  }
+
+  return article;
 }
 
 export async function saveArticle(article: ArticleDetail): Promise<{ feedKey: string }> {

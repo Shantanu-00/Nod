@@ -7,7 +7,7 @@ import {
   StagedPost 
 } from '@/types';
 import { tokenizeWords } from '@/lib/utils/rsvp';
-import { calculateReadingMetrics } from '@/lib/utils/a11y-metrics';
+import { calculateReadingMetrics, extractArticleSummary } from '@/lib/utils/a11y-metrics';
 
 interface AppState {
   // Reading & Ergonomics
@@ -91,6 +91,7 @@ interface AppState {
   stagePost: (post: {
     title: string;
     content: string;
+    summary?: string;
     category?: StagedPost['category'];
     tags?: string[];
     authorName?: string;
@@ -356,10 +357,12 @@ export const useStore = create<AppState>((set, get) => ({
     const tags = post.tags && post.tags.length > 0 ? post.tags : ['community', 'accessibility'];
     const authorName = post.authorName || get().editorDraft.authorName || 'Community Contributor';
     const handle = post.handle || get().editorDraft.handle || '@community';
+    const summary = post.summary?.trim() || extractArticleSummary(cleanContent, cleanTitle);
 
     const staged: StagedPost = {
       title: cleanTitle,
       content: cleanContent,
+      summary,
       category,
       tags,
       authorName,
@@ -393,6 +396,7 @@ export const useStore = create<AppState>((set, get) => ({
         body: JSON.stringify({
           title: staged.title,
           content: staged.content,
+          summary: staged.summary,
           category: staged.category,
           tags: staged.tags,
           author: {

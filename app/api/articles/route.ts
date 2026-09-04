@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { calculateReadingMetrics } from '@/lib/utils/a11y-metrics';
+import { calculateReadingMetrics, extractArticleSummary } from '@/lib/utils/a11y-metrics';
 import { saveArticle } from '@/lib/blobs/client';
 import { ArticleDetail } from '@/types';
 
@@ -27,13 +27,16 @@ export async function POST(request: NextRequest) {
     };
 
     const cleanMarkdown = content.trim();
-    // Generate clean sentence summary rather than cutting off at 160 characters
+    const cleanTitle = title.trim();
+
+    // Use explicit summary if valid, otherwise derive an accessible 1-2 sentence synopsis
     let cleanSummary = body.summary;
-    if (!cleanSummary || typeof cleanSummary !== 'string') {
-      const plainText = cleanMarkdown.replace(/[#*`_>]/g, '').replace(/\n+/g, ' ').trim();
-      const sentenceMatch = plainText.match(/[^.!?]+[.!?]/);
-      cleanSummary = sentenceMatch ? sentenceMatch[0].trim() : plainText.slice(0, 140).trim();
+    if (!cleanSummary || typeof cleanSummary !== 'string' || cleanSummary.trim().length === 0) {
+      cleanSummary = extractArticleSummary(cleanMarkdown, cleanTitle);
+    } else {
+      cleanSummary = cleanSummary.trim();
     }
+
 
     const article: ArticleDetail = {
       id,

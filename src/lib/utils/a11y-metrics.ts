@@ -71,3 +71,126 @@ export function getClarityTagStyle(grade: 'High Clarity' | 'Conversational' | 'I
       return { bg: 'bg-stone-100', text: 'text-stone-700', border: 'border-stone-200' };
   }
 }
+
+/**
+ * Intelligently extracts a concise, accessible summary (1-2 sentences, ~60-160 characters)
+ * from markdown content without breaking prematurely on abbreviations (vs., Dr., e.g.) or headings.
+ */
+export function extractArticleSummary(markdown: string, title?: string): string {
+  if (!markdown || typeof markdown !== 'string') return '';
+
+  const lines = markdown.split(/\r?\n/);
+  const normalizedTitle = title ? title.trim().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+  const proseLines: string[] = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    // Check if line is a markdown heading (# Title or ## Subheading)
+    if (/^#{1,6}\s+/.test(line)) {
+      const headingText = line.replace(/^#{1,6}\s+/, '').trim();
+      const normalizedHeading = headingText.toLowerCase().replace(/[^a-z0-9]/g, '');
+      // Skip if this heading repeats the title
+      if (normalizedTitle && normalizedHeading === normalizedTitle) {
+        continue;
+      }
+      continue;
+    }
+
+    // Skip thematic breaks
+    if (line.startsWith('---') || line.startsWith('***')) continue;
+
+    // Clean inline formatting: blockquotes, links, bold/italic, backticks
+    const cleanLine = line
+      .replace(/^>\s*/, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[*_`~]/g, '')
+      .trim();
+
+    // Skip if line merely echoes the article title
+    const normalizedClean = cleanLine.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (normalizedTitle && normalizedClean === normalizedTitle) {
+      continue;
+    }
+
+    if (cleanLine.length > 0) {
+      proseLines.push(cleanLine);
+      if (proseLines.join(' ').length > 300) break;
+    }
+  }
+
+  const plainText = (proseLines.length > 0 ? proseLines.join(' ') : markdown.replace(/[#*`_>~]/g, ''))
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!plainText) return '';
+
+  // Recognizes common abbreviations and honorifics that end in a period
+  const abbreviationPattern = /\b(?:vs|v|dr|mr|mrs|ms|prof|sr|jr|etc|eg|ie|al|st|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\.?$/i;
+
+  const rawSentences: string[] = [];
+  let currentSentence = '';
+  const tokens = plainText.split(/(\s+)/);
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    currentSentence += token;
+
+    if (/[.!?]$/.test(token)) {
+      const isAbbr = abbreviationPattern.test(token) || /^[A-Z]\.$/.test(token) || /\d+\.\d+$/.test(token);
+
+      if (!isAbbr) {
+        let nextWord = '';
+        for (let j = i + 1; j < tokens.length; j++) {
+          if (tokens[j].trim().length > 0) {
+            nextWord = tokens[j].trim();
+            break;
+          }
+        }
+
+        // Real sentence boundary if followed by whitespace and capital letter or end of text
+        if (!nextWord || /^[A-Z"'“‘]/.test(nextWord)) {
+          if (currentSentence.trim().length > 0) {
+            rawSentences.push(currentSentence.trim());
+            currentSentence = '';
+          }
+        }
+      }
+    }
+  }
+
+  if (currentSentence.trim().length > 0) {
+    rawSentences.push(currentSentence.trim());
+  }
+
+  // Assemble summary from sentences (aiming for 1-2 complete sentences under 165 chars)
+  let summary = '';
+  for (const s of rawSentences) {
+    if (!summary) {
+      summary = s;
+    } else if ((summary + ' ' + s).length <= 165) {
+      summary += ' ' + s;
+    } else {
+      break;
+    }
+  }
+
+  // Graceful guardrails for readability
+  if (summary.length < 45 && plainText.length > summary.length) {
+    if (plainText.length <= 150) {
+      summary = plainText;
+    } else {
+      const truncated = plainText.slice(0, 145);
+      const lastSpace = truncated.lastIndexOf(' ');
+      summary = (lastSpace > 60 ? truncated.slice(0, lastSpace) : truncated).trim() + '...';
+    }
+  } else if (summary.length > 185) {
+    const truncated = summary.slice(0, 160);
+    const lastSpace = truncated.lastIndexOf(' ');
+    summary = (lastSpace > 60 ? truncated.slice(0, lastSpace) : truncated).trim() + '...';
+  }
+
+  return summary.trim();
+}
+

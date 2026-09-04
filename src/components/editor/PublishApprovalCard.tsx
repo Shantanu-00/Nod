@@ -192,6 +192,12 @@ export function PublishApprovalCard() {
                   {staged.title}
                 </h4>
 
+                {staged.summary && (
+                  <p className="text-xs sm:text-sm text-brand-muted italic border-l-2 border-brand-green/40 pl-2.5">
+                    Feed Synopsis: &ldquo;{staged.summary}&rdquo;
+                  </p>
+                )}
+
                 {/* Live Readability Badges */}
                 <div className="flex items-center flex-wrap gap-4 text-xs text-brand-muted pt-2 border-t border-brand-border">
                   <div className="flex items-center gap-1.5">
